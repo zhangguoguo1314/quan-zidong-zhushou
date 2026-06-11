@@ -22,6 +22,7 @@ pip install -r "$BACKEND_DIR/requirements.txt"
 if [ ! -f "$BACKEND_DIR/.env" ]; then
   cp "$BACKEND_DIR/.env.example" "$BACKEND_DIR/.env"
 fi
+mkdir -p "$BACKEND_DIR/data"
 
 echo "安装前端依赖并构建静态文件..."
 cd "$FRONTEND_DIR"

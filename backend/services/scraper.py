@@ -1,5 +1,9 @@
-from playwright.async_api import async_playwright
 from core.config import settings
+
+try:
+    from playwright.async_api import async_playwright
+except Exception:
+    async_playwright = None
 
 
 class ScraperService:
@@ -8,6 +12,12 @@ class ScraperService:
 
     async def sign_in(self, account, site):
         """Sign in to a site using Playwright"""
+        if async_playwright is None:
+            return {
+                "success": False,
+                "error": "Playwright 未安装或当前设备不支持。手机 Termux 可先使用 Cookie/Token 插件，复杂浏览器自动化建议部署到 Linux/Docker。"
+            }
+
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=self.headless)
             context = await browser.new_context()

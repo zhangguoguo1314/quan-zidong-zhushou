@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.database import engine, Base
 from api.routes import auth, sites, accounts, tasks, logs
+from tasks.scheduler import start_scheduler, stop_scheduler, scheduler
 
 app = FastAPI(title="Account-Auto-Sign API", version="1.0.0")
 
@@ -24,6 +25,14 @@ app.include_router(logs.router)
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    if not scheduler.running:
+        start_scheduler()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    if scheduler.running:
+        stop_scheduler()
 
 
 @app.get("/api/health")

@@ -84,6 +84,11 @@ if (-not (Test-Path $EnvFile)) {
     Write-Host "OK  .env 已存在，跳过" -ForegroundColor Green
 }
 
+$DataDir = Join-Path $BackendDir "data"
+if (-not (Test-Path $DataDir)) {
+    New-Item -ItemType Directory -Path $DataDir | Out-Null
+}
+
 Write-Host ""
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host "  第 4 步：安装前端依赖并构建" -ForegroundColor Cyan

@@ -80,6 +80,7 @@ if [ ! -f "$BACKEND_DIR/.env" ]; then
 else
   echo "✓ .env 已存在，跳过"
 fi
+mkdir -p "$BACKEND_DIR/data"
 
 echo ""
 echo "======================================================"

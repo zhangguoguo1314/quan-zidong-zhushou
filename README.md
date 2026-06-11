@@ -127,7 +127,23 @@ bash scripts/deploy-termux.sh
 
 手机浏览器访问 http://127.0.0.1:8080
 
-### 方式五：WSToolbox + Termux 部署到安卓手机
+### 方式五：Termux 一键启动包
+
+**完整教程：[docs/TERMUX_BUNDLE.md](docs/TERMUX_BUNDLE.md)**
+
+这个方式适合手机上配置很久仍然失败的情况。包里已经带了构建好的前端，手机上不需要安装 Node.js，也不需要执行 `npm run build`。
+
+```bash
+termux-setup-storage
+cd ~/storage/downloads
+tar -xzf quan-zidong-zhushou-termux-bundle.tar.gz
+cd quan-zidong-zhushou
+bash scripts/termux-oneclick.sh
+```
+
+手机浏览器访问 http://127.0.0.1:8080
+
+### 方式六：WSToolbox + Termux 部署到安卓手机
 
 **完整教程：[docs/WSTOOLBOX.md](docs/WSTOOLBOX.md)**
 
@@ -146,6 +162,7 @@ bash scripts/deploy-wstoolbox.sh
 
 - 全环境部署指南（Linux/macOS/Windows/Docker）：[docs/DEPLOY.md](docs/DEPLOY.md)
 - Android 纯 Termux 部署指南：[docs/TERMUX.md](docs/TERMUX.md)
+- Android Termux 一键启动包：[docs/TERMUX_BUNDLE.md](docs/TERMUX_BUNDLE.md)
 - Android 手机部署指南（WSToolbox + Termux）：[docs/WSTOOLBOX.md](docs/WSTOOLBOX.md)
 
 ---

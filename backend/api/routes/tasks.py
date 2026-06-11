@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -42,6 +44,11 @@ def create_task(
     db.add(task)
     db.commit()
     db.refresh(task)
+    try:
+        from tasks.scheduler import add_task
+        add_task(task.id, task.cron)
+    except Exception:
+        pass
     return task
 
 
@@ -72,6 +79,11 @@ def create_tasks_bulk(
     db.commit()
     for task in tasks:
         db.refresh(task)
+        try:
+            from tasks.scheduler import add_task
+            add_task(task.id, task.cron)
+        except Exception:
+            pass
 
     return tasks
 
@@ -119,6 +131,13 @@ def update_task(
 
     db.commit()
     db.refresh(task)
+    try:
+        from tasks.scheduler import add_task, remove_task
+        remove_task(task.id)
+        if task.status == "enabled":
+            add_task(task.id, task.cron)
+    except Exception:
+        pass
     return task
 
 
@@ -139,13 +158,19 @@ def delete_task(
             detail="Task not found"
         )
 
+    try:
+        from tasks.scheduler import remove_task
+        remove_task(task.id)
+    except Exception:
+        pass
+
     db.delete(task)
     db.commit()
     return {"message": "Task deleted successfully"}
 
 
 @router.post("/{task_id}/run")
-def run_task_now(
+async def run_task_now(
     task_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -161,7 +186,7 @@ def run_task_now(
             detail="Task not found"
         )
 
-    from tasks.scheduler import run_task
-    run_task(task_id)
+    from tasks.scheduler import execute_task
+    asyncio.create_task(execute_task(task_id))
 
     return {"message": "Task execution started"}

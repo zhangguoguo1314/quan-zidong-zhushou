@@ -39,6 +39,7 @@ if [ ! -f "$BACKEND_DIR/.env" ]; then
   echo "创建后端 .env 配置..."
   cp "$BACKEND_DIR/.env.example" "$BACKEND_DIR/.env"
 fi
+mkdir -p "$BACKEND_DIR/data"
 
 echo "安装前端依赖..."
 cd "$FRONTEND_DIR"
