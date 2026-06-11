@@ -114,7 +114,20 @@ powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\start-windows.ps1
 ```
 
-### 方式四：部署到安卓手机
+### 方式四：纯 Termux 部署到安卓手机
+
+**完整教程：[docs/TERMUX.md](docs/TERMUX.md)**
+
+```bash
+# 在手机的 Termux 中执行
+git clone https://github.com/zhangguoguo1314/quan-zidong-zhushou.git
+cd quan-zidong-zhushou
+bash scripts/deploy-termux.sh
+```
+
+手机浏览器访问 http://127.0.0.1:8080
+
+### 方式五：WSToolbox + Termux 部署到安卓手机
 
 **完整教程：[docs/WSTOOLBOX.md](docs/WSTOOLBOX.md)**
 
@@ -132,6 +145,7 @@ bash scripts/deploy-wstoolbox.sh
 ## 详细部署文档
 
 - 全环境部署指南（Linux/macOS/Windows/Docker）：[docs/DEPLOY.md](docs/DEPLOY.md)
+- Android 纯 Termux 部署指南：[docs/TERMUX.md](docs/TERMUX.md)
 - Android 手机部署指南（WSToolbox + Termux）：[docs/WSTOOLBOX.md](docs/WSTOOLBOX.md)
 
 ---
@@ -143,6 +157,7 @@ bash scripts/deploy-wstoolbox.sh
 | Docker Compose | 3000 | 8000 | http://localhost:3000 |
 | 本地开发 (Vite) | 5173 | 8000 | http://localhost:5173 |
 | Nginx 托管前端 | 80/3000 | 8000（内部） | http://服务器IP |
+| 纯 Termux | 8080 | 8000（内部） | http://手机IP:8080 |
 | WSToolbox + Termux | 8080 | 8000（内部） | http://手机IP:8080 |
 
 ---
