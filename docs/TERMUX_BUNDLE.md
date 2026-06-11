@@ -112,6 +112,16 @@ pkg upgrade -y
 bash scripts/termux-oneclick.sh
 ```
 
+### 提示 .venv/bin/activate 不存在
+
+这通常是因为曾经在 `Download` 目录里运行过脚本，Android 共享存储不支持 Python 虚拟环境需要的软链接，导致 `.venv` 目录创建了一半。进入 Termux 自己的目录后删除坏目录再运行：
+
+```bash
+cd ~/quan-zidong-zhushou
+rm -rf .venv
+bash scripts/termux-oneclick.sh
+```
+
 ### 页面能打开但登录失败
 
 检查 API：

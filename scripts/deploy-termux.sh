@@ -30,7 +30,11 @@ pkg install -y python nodejs git nginx curl clang make openssl libffi
 echo ""
 echo "[2/8] 创建 Python 虚拟环境并安装后端依赖..."
 cd "$ROOT_DIR"
-if [ ! -d ".venv" ]; then
+if [ -d ".venv" ] && [ ! -f ".venv/bin/activate" ]; then
+  echo "检测到损坏的 .venv，正在删除并重新创建..."
+  rm -rf .venv
+fi
+if [ ! -f ".venv/bin/activate" ]; then
   python -m venv .venv
 fi
 source "$ROOT_DIR/.venv/bin/activate"
