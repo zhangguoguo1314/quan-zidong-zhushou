@@ -28,8 +28,6 @@ apiClient.interceptors.response.use(
           isRedirecting = false
         })
       }
-      // 关键修复：返回 reject 而非永远挂起的 Promise
-      // 这样调用方的 catch/finally 能正常执行
       return Promise.reject(error)
     }
     return Promise.reject(error)
@@ -38,15 +36,15 @@ apiClient.interceptors.response.use(
 
 // ============= 分类管理 API =============
 const categories = {
-  list: () => apiClient.get('/sites/categories'),
-  create: (data: any) => apiClient.post('/sites/categories', data),
-  update: (id: number | string, data: any) => apiClient.put(`/sites/categories/${id}`, data),
-  delete: (id: number | string) => apiClient.delete(`/sites/categories/${id}`),
+  list: () => apiClient.get('/api/sites/categories'),
+  create: (data: any) => apiClient.post('/api/sites/categories', data),
+  update: (id: number | string, data: any) => apiClient.put(`/api/sites/categories/${id}`, data),
+  delete: (id: number | string) => apiClient.delete(`/api/sites/categories/${id}`),
 }
 
 // ============= 分组站点 API =============
 const sitesGrouped = {
-  list: () => apiClient.get('/sites/grouped'),
+  list: () => apiClient.get('/api/sites/grouped'),
 }
 
 // 兼容之前的 api.get / api.post 用法
@@ -60,11 +58,11 @@ const api: any = Object.assign(
   },
   {
     apiClient,
-    getSitesCategories: () => apiClient.get('/sites/categories'),
-    createSiteCategory: (data: any) => apiClient.post('/sites/categories', data),
-    updateSiteCategory: (id: number | string, data: any) => apiClient.put(`/sites/categories/${id}`, data),
-    deleteSiteCategory: (id: number | string) => apiClient.delete(`/sites/categories/${id}`),
-    getSitesGrouped: () => apiClient.get('/sites/grouped'),
+    getSitesCategories: () => apiClient.get('/api/sites/categories'),
+    createSiteCategory: (data: any) => apiClient.post('/api/sites/categories', data),
+    updateSiteCategory: (id: number | string, data: any) => apiClient.put(`/api/sites/categories/${id}`, data),
+    deleteSiteCategory: (id: number | string) => apiClient.delete(`/api/sites/categories/${id}`),
+    getSitesGrouped: () => apiClient.get('/api/sites/grouped'),
     categories,
     sitesGrouped,
   }
