@@ -63,8 +63,13 @@ def delete_all_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    db.query(Log).join(Task).join(Account).filter(
+    # 先查询出要删除的日志 ID，再逐个删除（避免 SQLAlchemy 的 join delete 限制）
+    logs_to_delete = db.query(Log).join(Task).join(Account).filter(
         Account.user_id == current_user.id
-    ).delete()
+    ).all()
+
+    count = len(logs_to_delete)
+    for log in logs_to_delete:
+        db.delete(log)
     db.commit()
-    return {"message": "All logs deleted successfully"}
+    return {"message": f"All logs deleted successfully ({count} records)"}

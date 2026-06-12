@@ -9,6 +9,7 @@ class AccountBase(BaseModel):
 
 
 class AccountCreate(AccountBase):
+    nickname: Optional[str] = ""
     password: Optional[str] = None
     token: Optional[str] = None
     cookie: Optional[str] = None
@@ -16,6 +17,7 @@ class AccountCreate(AccountBase):
 
 class AccountUpdate(BaseModel):
     username: Optional[str] = None
+    nickname: Optional[str] = None
     password: Optional[str] = None
     token: Optional[str] = None
     cookie: Optional[str] = None
@@ -25,6 +27,7 @@ class AccountUpdate(BaseModel):
 class AccountResponse(AccountBase):
     id: int
     user_id: int
+    nickname: Optional[str] = ""
     password: Optional[str] = None
     token: Optional[str] = None
     cookie: Optional[str] = None

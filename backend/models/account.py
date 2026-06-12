@@ -11,6 +11,7 @@ class Account(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     site_id = Column(Integer, ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
     username = Column(String(100), nullable=False)
+    nickname = Column(String(100), default="")
     password = Column(String(255))
     token = Column(Text)
     cookie = Column(Text)

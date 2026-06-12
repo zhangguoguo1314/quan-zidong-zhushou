@@ -59,3 +59,25 @@ def get_current_user_info(
     current_user: User = Depends(__import__("api.deps", fromlist=["get_current_user"]).get_current_user)
 ):
     return current_user
+
+
+@router.post("/change-password")
+def change_password(
+    password_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(__import__("api.deps", fromlist=["get_current_user"]).get_current_user)
+):
+    if not verify_password(password_data.get("current_password", ""), current_user.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect current password"
+        )
+    new_password = password_data.get("new_password", "")
+    if len(new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters"
+        )
+    current_user.password = get_password_hash(new_password)
+    db.commit()
+    return {"success": True, "message": "Password changed successfully"}
