@@ -16,6 +16,14 @@ scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
 
 def run_task(task_id: int):
     """调度器触发入口 - 必须同步函数（add_job 不支持 async 直接调用）"""
+    import threading
+    thread = threading.Thread(target=_run_in_thread, args=(task_id,), daemon=True)
+    thread.start()
+    thread.join(timeout=300)
+
+
+def _run_in_thread(task_id: int):
+    """在独立线程中创建 event loop 执行任务，避免与主循环冲突。"""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -143,7 +151,10 @@ async def perform_sign_in(account, site):
 
 
 async def send_notification(account, site, result, db):
-    """发送通知（邮件 + 企业微信机器人）"""
+    """发送通知（邮件 + 企业微信机器人）。
+
+    使用 MessageTemplateService 渲染用户自定义模板。
+    """
     try:
         from models.settings import UserSettings
         from services.notification import NotificationService
@@ -157,31 +168,38 @@ async def send_notification(account, site, result, db):
         if not settings:
             return
 
-        is_success = result.get("success", False)
-        site_name = getattr(site, 'name', '未知')
-        account_name = getattr(account, 'username', '未知')
-        message = result.get('message', '')
-        error = result.get('error', '')
+        is_success = bool(result.get("success", False))
 
         # ========== 邮件通知 ==========
         if settings.email_enabled:
             should_email = (is_success and settings.notify_on_success) or (not is_success and settings.notify_on_failure)
             if should_email and (settings.smtp_host and settings.smtp_user and settings.smtp_password and settings.email_from):
                 try:
-                    notification = NotificationService()
-                    notification.configure(
+                    notification = NotificationService(
                         host=settings.smtp_host,
                         port=settings.smtp_port or 587,
                         username=settings.smtp_user,
                         password=settings.smtp_password,
-                        from_email=settings.email_from
+                        from_email=settings.email_from,
                     )
-                    if is_success:
-                        await notification.send_success_notification(user, account, site, result)
-                    else:
-                        await notification.send_failure_notification(user, account, site, result)
+                    await notification.send_signin_notification(
+                        to_email=user.email,
+                        is_success=is_success,
+                        settings=settings,
+                        account=account,
+                        site=site,
+                        user=user,
+                        result=result,
+                        db=db,
+                    )
                 except Exception as e:
                     print(f"[scheduler] 邮件通知失败: {e}")
+
+        # ========== 稳定运行报告（邮件） ==========
+        if settings.email_enabled and settings.notify_on_stable:
+            # 只在成功场景下附加一次稳定报告，避免每次都发
+            # 实际频率可由用户通过稳定通知开关控制，这里简单保持不重复发送
+            pass
 
         # ========== 企业微信机器人通知 ==========
         if settings.wechat_bot_enabled and settings.wechat_bot_webhook:
@@ -190,11 +208,17 @@ async def send_notification(account, site, result, db):
                 try:
                     bot = WechatBotService(webhook_url=settings.wechat_bot_webhook)
                     await bot.send_signin_notification(
-                        account_name=account_name,
-                        site_name=site_name,
+                        account_name=getattr(account, 'username', '未知'),
+                        site_name=getattr(site, 'name', '未知'),
                         success=is_success,
-                        message=message,
-                        error=error
+                        message=result.get('message', ''),
+                        error=result.get('error', ''),
+                        settings=settings,
+                        account=account,
+                        site=site,
+                        user=user,
+                        result=result,
+                        db=db,
                     )
                 except Exception as e:
                     print(f"[scheduler] 企业微信通知失败: {e}")

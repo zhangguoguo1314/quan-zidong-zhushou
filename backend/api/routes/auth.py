@@ -7,6 +7,7 @@ from core.security import get_password_hash, verify_password, create_access_toke
 from core.config import settings
 from models.user import User
 from schemas.user import UserCreate, UserLogin, UserResponse, Token
+from api.deps import get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -55,8 +56,7 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 def get_current_user_info(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(__import__("api.deps", fromlist=["get_current_user"]).get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     return current_user
 
@@ -65,7 +65,7 @@ def get_current_user_info(
 def change_password(
     password_data: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(__import__("api.deps", fromlist=["get_current_user"]).get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     if not verify_password(password_data.get("current_password", ""), current_user.password):
         raise HTTPException(

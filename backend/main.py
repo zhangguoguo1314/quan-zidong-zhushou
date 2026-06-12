@@ -3,9 +3,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 
-from core.database import engine, Base
+from core.database import engine, Base, SessionLocal
 from api.routes import auth, sites, accounts, tasks, logs, settings as settings_routes
 from tasks.scheduler import start_scheduler, stop_scheduler, scheduler
 
@@ -27,22 +27,38 @@ app.include_router(logs.router)
 app.include_router(settings_routes.router)
 
 
+def _migrate_database():
+    """启动时自动检测并补齐所有表缺失的列。"""
+    try:
+        # 1. 先创建所有尚未存在的表
+        Base.metadata.create_all(bind=engine)
+
+        # 2. 对已有表逐列检测，缺失则补齐
+        inspector = inspect(engine)
+        with engine.begin() as conn:
+            # 遍历所有 ORM 模型定义的表
+            for table_name, table in Base.metadata.tables.items():
+                existing_columns = {col["name"] for col in inspector.get_columns(table_name)}
+                for column in table.columns:
+                    if column.name not in existing_columns:
+                        # 根据列类型生成 ALTER TABLE 语句
+                        col_type = column.type.compile(dialect=engine.dialect)
+                        nullable = "NULL" if column.nullable else "NOT NULL"
+                        # SQLite 不允许非空列无默认值，这里简化：所有补齐列都用 NULL
+                        try:
+                            conn.execute(text(
+                                f'ALTER TABLE {table_name} ADD COLUMN "{column.name}" {col_type} NULL'
+                            ))
+                            print(f"[migrate] {table_name} 已添加列 {column.name} ({col_type})")
+                        except Exception as e:
+                            print(f"[migrate] {table_name}.{column.name} 添加失败: {e}")
+    except Exception as e:
+        print(f"[migrate] 数据库迁移失败: {e}")
+
+
 @app.on_event("startup")
 def on_startup():
-    Base.metadata.create_all(bind=engine)
-    # 为旧版本数据库添加缺失列
-    try:
-        with engine.begin() as conn:
-            columns = conn.execute(text("PRAGMA table_info(sites)")).fetchall()
-            col_names = {col[1] for col in columns}
-            if "api_config" not in col_names:
-                conn.execute(text("ALTER TABLE sites ADD COLUMN api_config TEXT"))
-            if "display_name" not in col_names:
-                conn.execute(text("ALTER TABLE sites ADD COLUMN display_name TEXT DEFAULT ''"))
-            if "category" not in col_names:
-                conn.execute(text("ALTER TABLE sites ADD COLUMN category TEXT DEFAULT '其他'"))
-    except Exception as e:
-        print(f"[main] 迁移数据库列失败: {e}")
+    _migrate_database()
 
     if not scheduler.running:
         start_scheduler()

@@ -10,15 +10,13 @@ COPY frontend/ ./
 RUN npm run build
 
 
-# 阶段 2: 构建后端镜像（无需 Playwright/Chrome，使用自定义 API 模式）
+# 阶段 2: 构建后端镜像
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# 安装最小依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# 确保 /data 目录存在（Hugging Face Spaces 用）
+RUN mkdir -p /app/data
 
 # 安装 Python 依赖
 COPY backend/requirements.txt .
@@ -30,12 +28,9 @@ COPY backend/ .
 # 复制前端构建产物到 backend/static
 COPY --from=frontend-builder /app/frontend/dist ./static
 
-RUN mkdir -p /app/data
+EXPOSE 7860
 
-EXPOSE 8000
-
-ENV DATABASE_URL=sqlite:///app/data/data.db
 ENV HOST=0.0.0.0
-ENV PORT=8000
+ENV PORT=7860
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]

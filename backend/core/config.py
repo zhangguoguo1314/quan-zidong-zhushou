@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings
 from typing import Optional
 
@@ -26,3 +27,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# 适配 Hugging Face Spaces：如果 /data 目录存在，则数据库写入 /data
+if os.path.isdir("/data"):
+    settings.DATABASE_URL = "sqlite:////data/data.db"

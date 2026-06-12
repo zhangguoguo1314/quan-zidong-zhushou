@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from sqlalchemy.exc import IntegrityError
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
 import asyncio
 
 from core.database import get_db
 from models.site import Site
+from models.category import Category
 from schemas.site import SiteCreate, SiteUpdate, SiteResponse, SiteTestRequest, SiteBulkImportRequest
+from schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse
 from api.deps import get_current_user
 from models.user import User
 
@@ -73,9 +76,92 @@ def get_site_presets(current_user: User = Depends(get_current_user)):
     return {"presets": SITE_PRESETS, "categories": SITE_CATEGORIES}
 
 
-@router.get("/categories")
-def get_site_categories(current_user: User = Depends(get_current_user)):
-    return {"categories": SITE_CATEGORIES}
+@router.get("/categories", response_model=List[CategoryResponse])
+def get_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    categories = (
+        db.query(Category)
+        .filter(Category.user_id == current_user.id)
+        .order_by(Category.sort_order.asc(), Category.name.asc())
+        .all()
+    )
+    return categories
+
+
+@router.get("/categories/{category_id}", response_model=CategoryResponse)
+def get_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    category = db.query(Category).filter(Category.id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    if category.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    return category
+
+
+@router.post("/categories", response_model=CategoryResponse)
+def create_category(
+    category_data: CategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    data = category_data.model_dump()
+    data["user_id"] = current_user.id
+    category = Category(**data)
+    db.add(category)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name already exists")
+    db.refresh(category)
+    return category
+
+
+@router.put("/categories/{category_id}", response_model=CategoryResponse)
+def update_category(
+    category_id: int,
+    category_data: CategoryUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    category = db.query(Category).filter(Category.id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    if category.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    update_data = category_data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(category, key, value)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name already exists")
+    db.refresh(category)
+    return category
+
+
+@router.delete("/categories/{category_id}")
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    category = db.query(Category).filter(Category.id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    if category.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    db.delete(category)
+    db.commit()
+    return {"message": "Category deleted successfully"}
 
 
 @router.get("", response_model=List[SiteResponse])
@@ -99,25 +185,41 @@ def get_sites(
 
 @router.get("/grouped")
 def get_sites_grouped(
+    grouped: Optional[bool] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     sites = db.query(Site).all()
-    groups: dict = {}
+    site_dicts = []
     for site in sites:
-        cat = site.category or "其他"
-        if cat not in groups:
-            groups[cat] = []
-        groups[cat].append({
+        site_dicts.append({
             "id": site.id,
             "name": site.name,
             "display_name": site.display_name or site.name,
             "type": site.type,
             "url": site.url,
-            "category": site.category,
+            "category": site.category or "其他",
             "created_at": site.created_at.isoformat() if site.created_at else None
         })
-    return {"groups": groups}
+
+    # 新格式：按 category 分组的数组
+    groups_map: Dict[str, list] = {}
+    for sd in site_dicts:
+        cat = sd.get("category") or "其他"
+        if cat not in groups_map:
+            groups_map[cat] = []
+        groups_map[cat].append(sd)
+
+    # 保持 groups 顺序（按分类名称）
+    grouped_list = [{"category": k, "sites": v} for k, v in groups_map.items()]
+
+    # 兼容旧的 grouped=true 逻辑：同时返回 groups dict 与 sites 平铺数组
+    result: Dict[str, Any] = {"groups": grouped_list}
+    if grouped is True or grouped is None:
+        # 保留旧前端使用的 dict 结构
+        result["groups_dict"] = groups_map
+    result["sites"] = site_dicts
+    return result
 
 
 @router.post("", response_model=SiteResponse)
