@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from '@/i18n'
 import api from '@/api'
@@ -8,6 +9,11 @@ import api from '@/api'
 const appStore = useAppStore()
 const { currentLang, setLang, t } = useI18n()
 const loading = ref(false)
+
+// ============= 日志详情相关状态 =============
+const detailDialogVisible = ref(false)
+const detailLoading = ref(false)
+const logDetail = ref<any>(null)
 
 const filters = ref({
   status: '',
@@ -28,6 +34,11 @@ const fetchLogs = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleExportLogs = () => {
+  const token = localStorage.getItem('token')
+  window.open('/api/logs/export?token=' + token)
 }
 
 const handleDelete = async (log: any) => {
@@ -65,6 +76,29 @@ const clearFilters = () => {
   fetchLogs()
 }
 
+// ============= 日志详情 =============
+const openLogDetail = async (log: any) => {
+  detailDialogVisible.value = true
+  detailLoading.value = true
+  logDetail.value = null
+  try {
+    const response = await api.get(`/api/logs/${log.id}`)
+    logDetail.value = response.data
+  } catch (_error) {
+    ElMessage.error('获取日志详情失败')
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+const copyRawResponse = () => {
+  if (!logDetail.value?.raw_response) return
+  navigator.clipboard
+    .writeText(typeof logDetail.value.raw_response === 'string' ? logDetail.value.raw_response : JSON.stringify(logDetail.value.raw_response, null, 2))
+    .then(() => ElMessage.success('已复制到剪贴板'))
+    .catch(() => ElMessage.warning('复制失败'))
+}
+
 onMounted(() => {
   fetchLogs()
 })
@@ -95,7 +129,13 @@ onMounted(() => {
     <main class="main-content">
       <header class="page-header">
         <h1>签到日志</h1>
-        <el-button type="danger" @click="handleDeleteAll">全部删除</el-button>
+        <div class="header-actions">
+          <el-button type="success" @click="handleExportLogs">
+            <el-icon><Download /></el-icon>
+            导出日志
+          </el-button>
+          <el-button type="danger" @click="handleDeleteAll">全部删除</el-button>
+        </div>
       </header>
 
       <div class="filters-bar">
@@ -119,13 +159,44 @@ onMounted(() => {
           <el-table-column prop="created_at" label="时间" width="180">
             <template #default="{ row }">{{ new Date(row.created_at).toLocaleString() }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="100">
+          <el-table-column label="操作" width="160">
             <template #default="{ row }">
+              <el-button type="primary" size="small" @click="openLogDetail(row)">详情</el-button>
               <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
       </div>
+
+      <!-- 日志详情对话框 -->
+      <el-dialog v-model="detailDialogVisible" title="日志详情" width="680px">
+        <div v-loading="detailLoading">
+          <template v-if="logDetail">
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="日志 ID">{{ logDetail.id }}</el-descriptions-item>
+              <el-descriptions-item label="任务 ID">{{ logDetail.task_id }}</el-descriptions-item>
+              <el-descriptions-item label="状态">
+                <el-tag :type="logDetail.status === 'success' ? 'success' : 'danger'">
+                  {{ logDetail.status === 'success' ? '成功' : '失败' }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="创建时间">{{ new Date(logDetail.created_at).toLocaleString() }}</el-descriptions-item>
+              <el-descriptions-item label="结果" :span="2">{{ logDetail.result || '—' }}</el-descriptions-item>
+            </el-descriptions>
+
+            <div v-if="logDetail.raw_response" style="margin-top: 16px">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+                <span style="font-weight: 600; color: #303133">原始响应</span>
+                <el-button size="small" @click="copyRawResponse">复制</el-button>
+              </div>
+              <pre style="background: #f5f7fa; border: 1px solid #e4e7ed; border-radius: 6px; padding: 16px; max-height: 400px; overflow: auto; font-size: 13px; white-space: pre-wrap; word-break: break-all">{{ typeof logDetail.raw_response === 'string' ? logDetail.raw_response : JSON.stringify(logDetail.raw_response, null, 2) }}</pre>
+            </div>
+          </template>
+        </div>
+        <template #footer>
+          <el-button @click="detailDialogVisible = false">关闭</el-button>
+        </template>
+      </el-dialog>
     </main>
   </div>
 </template>
@@ -143,4 +214,5 @@ onMounted(() => {
 .page-header h1 { margin: 0; font-size: 28px; font-weight: 600; color: #1e3a5f; }
 .filters-bar { display: flex; gap: 12px; margin-bottom: 16px; }
 .content-card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); }
+.header-actions { display: flex; gap: 10px; align-items: center; }
 </style>

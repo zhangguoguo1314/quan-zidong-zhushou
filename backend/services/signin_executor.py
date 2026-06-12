@@ -2,6 +2,7 @@ import httpx
 import json
 import asyncio
 from typing import Dict, Any, Optional
+from datetime import datetime
 
 
 async def execute_signin(
@@ -12,6 +13,8 @@ async def execute_signin(
     account_token: Optional[str],
     account_cookie: Optional[str],
     api_config: Optional[Dict[str, Any]],
+    account_id: Optional[int] = None,
+    db=None,
 ) -> Dict[str, Any]:
     """
     通用签到执行器
@@ -55,40 +58,71 @@ async def execute_signin(
                 "password": account_password,
             })
 
-            async with httpx.AsyncClient(timeout=30, verify=False, follow_redirects=True) as client:
-                if login_method == "POST":
-                    if content_type == "application/x-www-form-urlencoded":
-                        resp = await client.post(login_url, content=login_body_str, headers=login_headers)
-                    else:
-                        try:
-                            login_body = json.loads(login_body_str)
-                        except (json.JSONDecodeError, TypeError):
-                            login_body = {}
-                        resp = await client.post(login_url, json=login_body, headers=login_headers)
-                else:
-                    resp = await client.get(login_url, headers=login_headers)
-
-                # 保存登录 cookies
-                login_cookies = dict(resp.cookies)
-
-                try:
-                    login_data = resp.json()
-                except Exception:
-                    login_data = {"raw": resp.text}
-
-                # 从响应中提取 token
-                token_field = config.get("token_field", "") or config.get("token_path", "")
-                if token_field:
-                    parts = token_field.split(".")
-                    extracted = login_data
-                    for p in parts:
-                        if isinstance(extracted, dict):
-                            extracted = extracted.get(p, "")
+            try:
+                async with httpx.AsyncClient(timeout=30, verify=False, follow_redirects=True) as client:
+                    if login_method == "POST":
+                        if content_type == "application/x-www-form-urlencoded":
+                            resp = await client.post(login_url, content=login_body_str, headers=login_headers)
                         else:
-                            extracted = ""
-                            break
-                    if extracted:
-                        token = str(extracted)
+                            try:
+                                login_body = json.loads(login_body_str)
+                            except (json.JSONDecodeError, TypeError):
+                                login_body = {}
+                            resp = await client.post(login_url, json=login_body, headers=login_headers)
+                    else:
+                        resp = await client.get(login_url, headers=login_headers)
+
+                    # 保存登录 cookies
+                    login_cookies = dict(resp.cookies)
+
+                    try:
+                        login_data = resp.json()
+                    except Exception:
+                        login_data = {"raw": resp.text}
+
+                    # 检查登录是否成功
+                    if resp.status_code == 401:
+                        result["error"] = _classify_login_error(resp.status_code, resp.text, "密码错误或认证失败")
+                    elif resp.status_code == 404:
+                        result["error"] = _classify_login_error(resp.status_code, resp.text, "登录接口不存在 (404)")
+                    elif resp.status_code >= 500:
+                        result["error"] = _classify_login_error(resp.status_code, resp.text, f"服务器错误 (HTTP {resp.status_code})")
+                    elif resp.status_code == 403:
+                        result["error"] = _classify_login_error(resp.status_code, resp.text, "账号被禁止访问 (403 Forbidden)")
+                    else:
+                        # 从响应中提取 token
+                        token_field = config.get("token_field", "") or config.get("token_path", "")
+                        if token_field:
+                            parts = token_field.split(".")
+                            extracted = login_data
+                            for p in parts:
+                                if isinstance(extracted, dict):
+                                    extracted = extracted.get(p, "")
+                                else:
+                                    extracted = ""
+                                    break
+                            if extracted:
+                                token = str(extracted)
+
+                        # 如果 use_login_cookies=True 且登录成功，保存 cookies 到数据库
+                        use_login_cookies = config.get("use_login_cookies", False)
+                        if use_login_cookies and login_cookies and account_id is not None and db is not None:
+                            save_login_cookies(account_id, login_cookies, db)
+
+            except httpx.TimeoutException:
+                result["error"] = "登录请求超时，请检查网络连接或登录接口是否可达"
+            except httpx.ConnectError:
+                result["error"] = "登录连接失败，请检查网络连接或站点地址是否正确"
+            except httpx.HTTPStatusError as e:
+                result["error"] = f"登录HTTP错误: {e.response.status_code} - {e.response.text[:200]}"
+            except Exception as e:
+                result["error"] = f"登录过程异常: {str(e)[:300]}"
+
+            # 如果登录出错，直接返回
+            if result.get("error"):
+                result["raw_response"] = resp.text[:500] if 'resp' in dir() else ""
+                result["status_code"] = resp.status_code if 'resp' in dir() else 0
+                return result
 
         # Step 2: 执行签到
         signin_url = config.get("signin_url", "").strip() or site_url
@@ -130,46 +164,60 @@ async def execute_signin(
             "username": account_username,
         })
 
-        async with httpx.AsyncClient(timeout=30, verify=False, follow_redirects=True) as client:
-            # 如果需要复用登录 cookies
-            use_login_cookies = config.get("use_login_cookies", False)
-            if use_login_cookies and login_cookies:
-                client.cookies.update(login_cookies)
+        try:
+            async with httpx.AsyncClient(timeout=30, verify=False, follow_redirects=True) as client:
+                # 如果需要复用登录 cookies
+                use_login_cookies = config.get("use_login_cookies", False)
+                if use_login_cookies and login_cookies:
+                    client.cookies.update(login_cookies)
 
-            # 如果用户提供了 account_cookie，也加上
-            if account_cookie:
-                for cookie_str in account_cookie.split(";"):
-                    cookie_str = cookie_str.strip()
-                    if "=" in cookie_str:
-                        k, v = cookie_str.split("=", 1)
-                        client.cookies.set(k.strip(), v.strip())
+                # 如果用户提供了 account_cookie，也加上
+                if account_cookie:
+                    for cookie_str in account_cookie.split(";"):
+                        cookie_str = cookie_str.strip()
+                        if "=" in cookie_str:
+                            k, v = cookie_str.split("=", 1)
+                            client.cookies.set(k.strip(), v.strip())
 
-            if signin_method == "POST":
-                if signin_content_type == "application/x-www-form-urlencoded":
-                    resp = await client.post(signin_url, content=signin_body_str, headers=signin_headers)
+                if signin_method == "POST":
+                    if signin_content_type == "application/x-www-form-urlencoded":
+                        resp = await client.post(signin_url, content=signin_body_str, headers=signin_headers)
+                    else:
+                        try:
+                            signin_body = json.loads(signin_body_str)
+                        except (json.JSONDecodeError, TypeError):
+                            signin_body = {}
+                        resp = await client.post(signin_url, json=signin_body, headers=signin_headers)
+                elif signin_method == "GET":
+                    resp = await client.get(signin_url, headers=signin_headers)
                 else:
-                    try:
-                        signin_body = json.loads(signin_body_str)
-                    except (json.JSONDecodeError, TypeError):
-                        signin_body = {}
-                    resp = await client.post(signin_url, json=signin_body, headers=signin_headers)
-            elif signin_method == "GET":
-                resp = await client.get(signin_url, headers=signin_headers)
-            else:
-                if signin_content_type == "application/x-www-form-urlencoded":
-                    resp = await client.put(signin_url, content=signin_body_str, headers=signin_headers)
-                else:
-                    try:
-                        signin_body = json.loads(signin_body_str)
-                    except (json.JSONDecodeError, TypeError):
-                        signin_body = {}
-                    resp = await client.put(signin_url, json=signin_body, headers=signin_headers)
+                    if signin_content_type == "application/x-www-form-urlencoded":
+                        resp = await client.put(signin_url, content=signin_body_str, headers=signin_headers)
+                    else:
+                        try:
+                            signin_body = json.loads(signin_body_str)
+                        except (json.JSONDecodeError, TypeError):
+                            signin_body = {}
+                        resp = await client.put(signin_url, json=signin_body, headers=signin_headers)
 
-            resp_text = resp.text
-            try:
-                resp_data = resp.json()
-            except Exception:
-                resp_data = {"raw": resp_text}
+                resp_text = resp.text
+                try:
+                    resp_data = resp.json()
+                except Exception:
+                    resp_data = {"raw": resp_text}
+
+        except httpx.TimeoutException:
+            result["error"] = "签到请求超时，请检查网络连接或签到接口是否可达"
+            return result
+        except httpx.ConnectError:
+            result["error"] = "签到连接失败，请检查网络连接或站点地址是否正确"
+            return result
+        except httpx.HTTPStatusError as e:
+            result["error"] = f"签到HTTP错误: {e.response.status_code} - {e.response.text[:200]}"
+            return result
+        except Exception as e:
+            result["error"] = f"签到请求异常: {str(e)[:300]}"
+            return result
 
         # Step 3: 检查是否成功
         success_check = config.get("success_check", "") or config.get("success_field", "")
@@ -201,29 +249,61 @@ async def execute_signin(
                     result["success"] = True
                     result["message"] = f"签到请求已发送 (HTTP {resp.status_code})"
                 else:
-                    result["error"] = f"HTTP {resp.status_code}: {resp_text[:200]}"
+                    result["error"] = _classify_signin_error(resp.status_code, resp_text)
             else:
                 if resp.status_code == 200:
                     result["success"] = True
-                    result["message"] = f"签到请求已发送 (HTTP {resp.status_code})"
+                    result["message"] = "签到请求已发送"
                 else:
-                    result["error"] = f"HTTP {resp.status_code}: {resp_text[:200]}"
+                    result["error"] = _classify_signin_error(resp.status_code, resp_text)
         else:
             if resp.status_code == 200:
                 result["success"] = True
                 result["message"] = "签到请求已发送"
             else:
-                result["error"] = f"HTTP {resp.status_code}: {resp_text[:200]}"
+                result["error"] = _classify_signin_error(resp.status_code, resp_text)
 
         result["raw_response"] = resp_text[:500] if resp_text else ""
         result["status_code"] = resp.status_code
 
     except httpx.TimeoutException:
-        result["error"] = "请求超时"
+        result["error"] = "请求超时，请检查网络连接"
+    except httpx.ConnectError:
+        result["error"] = "连接失败，请检查网络连接或站点地址是否正确"
     except Exception as e:
-        result["error"] = str(e)[:300]
+        result["error"] = f"执行异常: {str(e)[:300]}"
 
     return result
+
+
+# ============ Cookie 存储函数 ============
+
+def save_login_cookies(account_id: int, cookies_dict: dict, db):
+    """将登录 cookies 保存到数据库"""
+    try:
+        from models.account import Account
+        account = db.query(Account).filter(Account.id == account_id).first()
+        if account:
+            account.login_cookies = json.dumps(cookies_dict, ensure_ascii=False)
+            account.cookies_updated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            db.commit()
+            print(f"[signin_executor] 已保存账号 {account_id} 的登录 cookies")
+    except Exception as e:
+        print(f"[signin_executor] 保存 cookies 失败: {e}")
+
+
+def get_login_cookies(account_id: int, db) -> dict:
+    """从数据库获取登录 cookies"""
+    try:
+        from models.account import Account
+        account = db.query(Account).filter(Account.id == account_id).first()
+        if account and account.login_cookies:
+            cookies = json.loads(account.login_cookies)
+            if isinstance(cookies, dict):
+                return cookies
+    except Exception as e:
+        print(f"[signin_executor] 获取 cookies 失败: {e}")
+    return {}
 
 
 # ============ 辅助方法 ============
@@ -261,3 +341,51 @@ def _extract_field(data: Any, path: str) -> Any:
         else:
             return None
     return current
+
+
+def _classify_login_error(status_code: int, resp_text: str, default_msg: str) -> str:
+    """根据登录响应分类错误类型，提供更详细的错误提示"""
+    text = resp_text[:200].lower() if resp_text else ""
+
+    if status_code == 401:
+        if "password" in text or "密码" in text:
+            return f"密码错误 (HTTP 401): {resp_text[:200]}"
+        elif "user" in text or "账号" in text or "account" in text:
+            return f"账号不存在或认证失败 (HTTP 401): {resp_text[:200]}"
+        else:
+            return f"认证失败 (HTTP 401): {resp_text[:200]}"
+
+    if status_code == 403:
+        return f"账号被禁止访问 (HTTP 403): {resp_text[:200]}"
+
+    if status_code == 404:
+        return f"登录接口不存在 (HTTP 404): 请检查站点配置中的登录URL是否正确"
+
+    if status_code >= 500:
+        return f"服务器内部错误 (HTTP {status_code}): 服务端可能暂时不可用，请稍后重试"
+
+    return f"{default_msg}: {resp_text[:200]}"
+
+
+def _classify_signin_error(status_code: int, resp_text: str) -> str:
+    """根据签到响应分类错误类型，提供更详细的错误提示"""
+    text = resp_text[:200].lower() if resp_text else ""
+
+    if status_code == 401:
+        return f"未登录或登录已过期 (HTTP 401): {resp_text[:200]}"
+
+    if status_code == 403:
+        if "permission" in text or "权限" in text:
+            return f"权限不足 (HTTP 403): {resp_text[:200]}"
+        return f"禁止访问 (HTTP 403): {resp_text[:200]}"
+
+    if status_code == 404:
+        return f"签到接口不存在 (HTTP 404): 请检查站点配置中的签到URL是否正确"
+
+    if status_code == 429:
+        return f"请求过于频繁 (HTTP 429): 请稍后重试"
+
+    if status_code >= 500:
+        return f"服务器内部错误 (HTTP {status_code}): 服务端可能暂时不可用，请稍后重试"
+
+    return f"HTTP {status_code}: {resp_text[:200]}"

@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import text, inspect
 
 from core.database import engine, Base, SessionLocal
-from api.routes import auth, sites, accounts, tasks, logs, settings as settings_routes
+from api.routes import auth, sites, accounts, tasks, logs, settings as settings_routes, config_generator
 from tasks.scheduler import start_scheduler, stop_scheduler, scheduler
 
 app = FastAPI(title="Account-Auto-Sign API", version="2.0.0")
@@ -25,6 +25,7 @@ app.include_router(accounts.router)
 app.include_router(tasks.router)
 app.include_router(logs.router)
 app.include_router(settings_routes.router)
+app.include_router(config_generator.router)
 
 
 def _migrate_database():

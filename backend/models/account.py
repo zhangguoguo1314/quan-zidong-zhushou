@@ -15,6 +15,8 @@ class Account(Base):
     password = Column(String(255))
     token = Column(Text)
     cookie = Column(Text)
+    login_cookies = Column(Text, default="")
+    cookies_updated_at = Column(String(30), default="")
     status = Column(String(20), default="active")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

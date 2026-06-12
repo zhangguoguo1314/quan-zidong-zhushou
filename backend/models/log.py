@@ -11,6 +11,7 @@ class Log(Base):
     task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
     result = Column(Text)
     status = Column(String(20), nullable=False)
+    raw_response = Column(Text, default="")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     task = relationship("Task", back_populates="logs")

@@ -31,6 +31,85 @@ const categoryForm = ref({
   is_public: true,
 })
 
+// ============= AI 配置生成器相关状态 =============
+const probeForm = ref({
+  url: '',
+  username: '',
+  password: '',
+})
+const probing = ref(false)
+const probeResult = ref<any>(null)
+const probeError = ref('')
+
+const handleProbe = async () => {
+  if (!probeForm.value.url.trim()) {
+    ElMessage.warning('请输入网站地址')
+    return
+  }
+  probing.value = true
+  probeResult.value = null
+  probeError.value = ''
+  try {
+    const payload: any = { url: probeForm.value.url.trim() }
+    if (probeForm.value.username.trim()) payload.username = probeForm.value.username.trim()
+    if (probeForm.value.password.trim()) payload.password = probeForm.value.password.trim()
+    const response = await api.post('/api/config-generator/probe', payload)
+    probeResult.value = response.data
+    if (response.data.success) {
+      ElMessage.success('探测完成')
+    } else {
+      probeError.value = response.data.error || '探测失败'
+      ElMessage.warning('探测未发现可用接口')
+    }
+  } catch (_error: any) {
+    probeError.value = '探测请求失败，请检查网站地址是否正确'
+    ElMessage.error('探测请求失败')
+  } finally {
+    probing.value = false
+  }
+}
+
+const copyProbeConfig = () => {
+  if (!probeResult.value?.api_config) return
+  navigator.clipboard
+    .writeText(JSON.stringify(probeResult.value.api_config, null, 2))
+    .then(() => ElMessage.success('已复制 api_config 到剪贴板'))
+    .catch(() => ElMessage.warning('复制失败'))
+}
+
+const copyProbeCurl = () => {
+  if (!probeResult.value?.curl_command) return
+  navigator.clipboard
+    .writeText(probeResult.value.curl_command)
+    .then(() => ElMessage.success('已复制 curl 命令到剪贴板'))
+    .catch(() => ElMessage.warning('复制失败'))
+}
+
+const importProbeAsSite = () => {
+  if (!probeResult.value?.api_config) return
+  const cfg = probeResult.value.api_config
+  editingSite.value = null
+  form.value = {
+    name: '',
+    display_name: '',
+    category: '其他',
+    type: 'custom-api',
+    url: probeForm.value.url.trim(),
+    api_config: { ...defaultApiConfig, ...cfg },
+  }
+  // 尝试从 URL 提取站点名称
+  try {
+    const u = new URL(probeForm.value.url.trim())
+    form.value.name = u.hostname
+    form.value.display_name = u.hostname
+  } catch {
+    form.value.name = '探测站点'
+  }
+  selectedPreset.value = ''
+  dialogVisible.value = true
+  ElMessage.info('已自动填充站点创建表单，请补充信息后提交')
+}
+
 // ============= 按分类分组的站点列表 =============
 const groupedSites = ref<any[]>([])
 const useGroupedView = ref(true)
@@ -550,6 +629,92 @@ onMounted(async () => {
           <el-button type="primary" @click="openDialog()">添加网站</el-button>
         </div>
       </header>
+
+      <!-- AI 智能配置生成器 -->
+      <div class="content-card" style="margin-bottom: 16px">
+        <div class="card-title-row">
+          <h2 class="card-title">AI 智能配置生成器</h2>
+        </div>
+        <div class="probe-form">
+          <el-form :inline="false" label-width="100px">
+            <el-form-item label="网站地址" required>
+              <el-input v-model="probeForm.url" placeholder="https://example.com" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="测试账号">
+              <el-input v-model="probeForm.username" placeholder="选填，用于登录探测" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="测试密码">
+              <el-input v-model="probeForm.password" type="password" show-password placeholder="选填，用于登录探测" style="width: 100%" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="probing" @click="handleProbe">开始探测</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <!-- 探测成功结果 -->
+        <div v-if="probeResult && probeResult.success" class="probe-result-section">
+          <el-alert type="success" title="探测成功" :closable="false" show-icon style="margin-bottom: 16px" />
+
+          <div v-if="probeResult.login_url || probeResult.signin_url" style="margin-bottom: 16px">
+            <div v-if="probeResult.login_url" style="margin-bottom: 8px">
+              <span class="hint">登录 URL：</span>
+              <code>{{ probeResult.login_url }}</code>
+            </div>
+            <div v-if="probeResult.signin_url">
+              <span class="hint">签到 URL：</span>
+              <code>{{ probeResult.signin_url }}</code>
+            </div>
+          </div>
+
+          <div v-if="probeResult.api_config" style="margin-bottom: 16px">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+              <span style="font-weight: 600; color: #303133">生成的 api_config</span>
+              <el-button size="small" @click="copyProbeConfig">复制</el-button>
+            </div>
+            <pre class="probe-code-block">{{ JSON.stringify(probeResult.api_config, null, 2) }}</pre>
+          </div>
+
+          <div v-if="probeResult.curl_command" style="margin-bottom: 16px">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+              <span style="font-weight: 600; color: #303133">curl 测试命令</span>
+              <el-button size="small" @click="copyProbeCurl">复制</el-button>
+            </div>
+            <pre class="probe-code-block">{{ probeResult.curl_command }}</pre>
+          </div>
+
+          <el-button type="success" @click="importProbeAsSite">一键导入为站点</el-button>
+        </div>
+
+        <!-- 探测失败结果 -->
+        <div v-if="probeResult && !probeResult.success" class="probe-result-section">
+          <el-alert type="warning" title="探测未发现可用接口" :closable="false" show-icon style="margin-bottom: 16px">
+            <template #default>
+              <div>{{ probeError || probeResult.error || '未能自动探测到登录和签到接口' }}</div>
+            </template>
+          </el-alert>
+
+          <div v-if="probeResult.probed_endpoints && probeResult.probed_endpoints.length > 0">
+            <div style="font-weight: 600; color: #303133; margin-bottom: 8px">已探测的端点：</div>
+            <el-table :data="probeResult.probed_endpoints" size="small" style="width: 100%">
+              <el-table-column prop="url" label="端点" min-width="300" show-overflow-tooltip />
+              <el-table-column prop="status" label="状态" width="100">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="row.status === 200 ? 'success' : row.status ? 'warning' : 'info'">
+                    {{ row.status || '无响应' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="content_type" label="类型" width="150" show-overflow-tooltip />
+            </el-table>
+          </div>
+        </div>
+
+        <!-- 探测错误 -->
+        <div v-if="probeError && !probeResult" class="probe-result-section">
+          <el-alert type="error" :title="probeError" :closable="false" show-icon />
+        </div>
+      </div>
 
       <!-- 分类管理卡片 -->
       <div class="content-card" v-loading="categoriesLoading" style="margin-bottom: 16px">
@@ -1140,5 +1305,27 @@ code {
   color: #909399;
   font-size: 13px;
   margin-left: auto;
+}
+
+/* AI 配置生成器 */
+.probe-form {
+  margin-bottom: 8px;
+}
+.probe-result-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+.probe-code-block {
+  background: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  padding: 16px;
+  max-height: 400px;
+  overflow: auto;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
 }
 </style>

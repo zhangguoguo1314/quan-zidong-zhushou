@@ -63,7 +63,7 @@ async def execute_task(task_id: int):
             return
 
         print(f"[scheduler] 开始执行任务 {task_id}: {account.username} @ {getattr(site, 'name', '?')}")
-        result = await perform_sign_in(account, site)
+        result = await perform_sign_in(account, site, db=db)
         print(f"[scheduler] 任务 {task_id} 执行结果: {result}")
         _write_log(db, task_id, result)
 
@@ -86,10 +86,19 @@ async def execute_task(task_id: int):
 
 def _write_log(db: Session, task_id: int, result: dict):
     try:
+        raw_response = result.get("raw_response", "")
+        # 构建详细的 result JSON 字符串
+        detail = {
+            "success": result.get("success", False),
+            "error": result.get("error", ""),
+            "message": result.get("message", ""),
+            "status_code": result.get("status_code", 0),
+        }
         log = Log(
             task_id=task_id,
-            result=str(result),
-            status="success" if result.get("success") else "failed"
+            result=json.dumps(detail, ensure_ascii=False),
+            status="success" if result.get("success") else "failed",
+            raw_response=raw_response[:2000] if raw_response else "",
         )
         db.add(log)
         db.commit()
@@ -97,7 +106,7 @@ def _write_log(db: Session, task_id: int, result: dict):
         print(f"[scheduler] 写入日志失败: {e}")
 
 
-async def perform_sign_in(account, site):
+async def perform_sign_in(account, site, db=None):
     """根据站点类型动态选择签到插件"""
     site_type = (site.type or "").lower()
     api_config = getattr(site, "api_config", None)
@@ -116,6 +125,10 @@ async def perform_sign_in(account, site):
     result = {"success": False, "error": "未知类型"}
 
     try:
+        # 0. Cookie 心跳检查：如果配置了 use_login_cookies 且 cookies 过期，先重新登录刷新
+        if api_config and api_config.get("use_login_cookies", False) and db is not None:
+            await refresh_cookies_if_needed(account, site, api_config, db)
+
         # 1. 如果有 api_config（无论是直接配置的还是从预设获取的），使用通用执行器
         if api_config:
             from services.signin_executor import execute_signin
@@ -127,6 +140,8 @@ async def perform_sign_in(account, site):
                 account_token=getattr(account, "token", None),
                 account_cookie=getattr(account, "cookie", None),
                 api_config=api_config,
+                account_id=account.id if account else None,
+                db=db,
             )
 
         # 2. forum / custom - Playwright 爬虫模式（仅保留兼容）
@@ -175,6 +190,53 @@ def _get_preset_api_config(site_type: str):
     except Exception as e:
         print(f"[scheduler] 获取预设配置失败: {e}")
     return None
+
+
+async def refresh_cookies_if_needed(account, site, api_config: dict, db):
+    """Cookie 心跳刷新：检查 cookies_updated_at，如果超过心跳间隔则重新登录刷新 cookies。
+
+    默认心跳间隔为 24 小时，可通过 api_config 中的 cookie_heartbeat_hours 字段自定义。
+    """
+    try:
+        from services.signin_executor import execute_signin, save_login_cookies
+
+        cookies_updated_at = getattr(account, "cookies_updated_at", "") or ""
+        heartbeat_hours = api_config.get("cookie_heartbeat_hours", 24)
+
+        need_refresh = False
+        if not cookies_updated_at:
+            need_refresh = True
+        else:
+            try:
+                updated = datetime.strptime(cookies_updated_at, "%Y-%m-%d %H:%M:%S")
+                elapsed = (datetime.utcnow() - updated).total_seconds()
+                if elapsed > heartbeat_hours * 3600:
+                    need_refresh = True
+            except (ValueError, TypeError):
+                need_refresh = True
+
+        if need_refresh:
+            print(f"[scheduler] Cookies 已过期或不存在 (上次更新: {cookies_updated_at})，重新登录刷新...")
+            login_result = await execute_signin(
+                site_type=(site.type or "").lower(),
+                site_url=getattr(site, "url", "") or "",
+                account_username=account.username or "",
+                account_password=account.password or "",
+                account_token=getattr(account, "token", None),
+                account_cookie=getattr(account, "cookie", None),
+                api_config=api_config,
+                account_id=account.id if account else None,
+                db=db,
+            )
+            if login_result.get("success"):
+                print(f"[scheduler] Cookies 刷新成功")
+            else:
+                print(f"[scheduler] Cookies 刷新失败: {login_result.get('error', '未知错误')}")
+        else:
+            print(f"[scheduler] Cookies 仍在有效期内 (上次更新: {cookies_updated_at})，跳过刷新")
+
+    except Exception as e:
+        print(f"[scheduler] Cookie 心跳刷新异常: {e}")
 
 
 async def send_notification(account, site, result, db):
