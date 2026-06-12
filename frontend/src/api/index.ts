@@ -1,4 +1,5 @@
 import axios from 'axios'
+import router from '@/router'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
@@ -13,12 +14,23 @@ apiClient.interceptors.request.use(config => {
   return config
 })
 
+// 标记是否正在处理 401 跳转，防止多个并发 401 重复触发
+let isRedirecting = false
+
 apiClient.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
-      window.location.href = '/login'
+      if (!isRedirecting) {
+        isRedirecting = true
+        // 用 router.push 替代 window.location.href，避免页面硬刷新
+        router.push({ name: 'Login' }).finally(() => {
+          isRedirecting = false
+        })
+      }
+      // 返回一个已 reject 的 promise，但不再让错误冒泡到页面组件
+      return new Promise(() => {})
     }
     return Promise.reject(error)
   }
