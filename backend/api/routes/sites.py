@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
+from pydantic import BaseModel
 import asyncio
 
 from core.database import get_db
@@ -246,3 +247,34 @@ def test_sign_in(
         return result
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+class ManualSigninRequest(BaseModel):
+    account_id: int
+
+
+@router.post("/{site_id}/signin")
+async def manual_sign_in(
+    site_id: int,
+    request: ManualSigninRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """手动签到 - 立即执行一次签到操作"""
+    from models.account import Account
+    from tasks.scheduler import perform_sign_in
+
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    account = db.query(Account).filter(
+        Account.id == request.account_id,
+        Account.site_id == site_id,
+        Account.user_id == current_user.id
+    ).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    result = await perform_sign_in(account, site)
+    return result
