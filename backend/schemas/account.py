@@ -32,9 +32,9 @@ class AccountResponse(AccountBase):
     token: Optional[str] = None
     cookie: Optional[str] = None
     status: str
-    total_signins: int = 0
-    success_count: int = 0
-    fail_count: int = 0
+    total_signins: Optional[int] = 0
+    success_count: Optional[int] = 0
+    fail_count: Optional[int] = 0
     created_at: datetime
 
     class Config:
