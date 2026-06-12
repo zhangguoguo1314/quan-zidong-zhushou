@@ -18,22 +18,36 @@ const loading = ref(false)
 
 const handleLogin = async () => {
   if (!form.value.email || !form.value.password) {
-    ElMessage.warning('Please fill in all fields')
+    ElMessage.warning(t('login.fillAll') || 'Please fill in all fields')
     return
   }
 
   loading.value = true
   try {
+    // 1. 登录获取 token
     const response = await api.post('/api/auth/login', form.value)
     const { access_token } = response.data
 
+    // 2. 先存 token 到 localStorage，确保后续请求能带上
+    localStorage.setItem('token', access_token)
+
+    // 3. 获取用户信息（此时 localStorage 已有 token，拦截器会自动带上）
     const userResponse = await api.get('/api/auth/me')
+
+    // 4. 设置 auth store
     authStore.setAuth(access_token, userResponse.data)
 
-    ElMessage.success('Login successful')
+    ElMessage.success(t('common.success') || 'Login successful')
     router.push('/')
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || 'Login failed')
+    // 清理可能残留的 token
+    localStorage.removeItem('token')
+    const detail = error.response?.data?.detail
+    if (detail) {
+      ElMessage.error(detail)
+    } else {
+      ElMessage.error(t('common.failed') || 'Login failed')
+    }
   } finally {
     loading.value = false
   }
@@ -145,5 +159,16 @@ const handleLogin = async () => {
 
 .register-link a:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .login-card {
+    width: 90%;
+    padding: 24px;
+    margin: 12px;
+  }
+  .title {
+    font-size: 22px;
+  }
 }
 </style>

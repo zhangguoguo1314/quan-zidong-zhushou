@@ -24,13 +24,13 @@ apiClient.interceptors.response.use(
       localStorage.removeItem('token')
       if (!isRedirecting) {
         isRedirecting = true
-        // 用 router.push 替代 window.location.href，避免页面硬刷新
         router.push({ name: 'Login' }).finally(() => {
           isRedirecting = false
         })
       }
-      // 返回一个已 reject 的 promise，但不再让错误冒泡到页面组件
-      return new Promise(() => {})
+      // 关键修复：返回 reject 而非永远挂起的 Promise
+      // 这样调用方的 catch/finally 能正常执行
+      return Promise.reject(error)
     }
     return Promise.reject(error)
   }
