@@ -4,5 +4,6 @@ from .category import Category
 from .account import Account
 from .task import Task
 from .log import Log
+from .settings import UserSettings
 
-__all__ = ["User", "Site", "Category", "Account", "Task", "Log"]
+__all__ = ["User", "Site", "Category", "Account", "Task", "Log", "UserSettings"]
