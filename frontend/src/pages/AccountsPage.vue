@@ -25,6 +25,7 @@ const form = ref({
 
 const importFile = ref<any>(null)
 const importSiteId = ref<number | null>(null)
+const changePassword = ref(false)
 
 const fetchAccounts = async () => {
   loading.value = true
@@ -57,16 +58,18 @@ const totalAccounts = computed(() => {
 const openDialog = (account?: any) => {
   if (account) {
     editingAccount.value = account
+    changePassword.value = false
     form.value = {
       site_id: account.site_id || null,
       username: account.username,
       nickname: account.nickname || '',
-      password: account.password || '',
+      password: '',
       token: account.token || '',
       cookie: account.cookie || ''
     }
   } else {
     editingAccount.value = null
+    changePassword.value = false
     form.value = { site_id: null, username: '', nickname: '', password: '', token: '', cookie: '' }
   }
   dialogVisible.value = true
@@ -77,8 +80,12 @@ const handleSubmit = async () => {
     ElMessage.warning('请填写必填字段')
     return
   }
-  const payload = { ...form.value }
+  const payload: any = { ...form.value }
   if (!payload.nickname) delete payload.nickname
+  // 编辑时：如果不需要修改密码，则不发送 password 字段
+  if (editingAccount.value && !changePassword.value) {
+    delete payload.password
+  }
   try {
     if (editingAccount.value) {
       await api.put(`/api/accounts/${editingAccount.value.id}`, payload)
@@ -274,7 +281,10 @@ onMounted(() => {
           <el-form-item label="昵称">
             <el-input v-model="form.nickname" placeholder="便于管理的备注名（可选）" />
           </el-form-item>
-          <el-form-item label="密码">
+          <el-form-item v-if="editingAccount" label="修改密码">
+            <el-switch v-model="changePassword" active-text="是" inactive-text="否" />
+          </el-form-item>
+          <el-form-item v-if="!editingAccount || changePassword" label="密码">
             <el-input v-model="form.password" type="password" show-password placeholder="登录密码" />
           </el-form-item>
           <el-form-item label="Token">

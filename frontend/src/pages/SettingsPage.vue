@@ -39,6 +39,10 @@ const settingsForm = ref({
   status_report_enabled: false,
   status_report_interval: 360,
   status_report_last_sent: '',
+  ai_api_url: '',
+  ai_api_key: '',
+  ai_model: '',
+  ai_custom_prompt: '',
 })
 
 // 模板字段
@@ -83,6 +87,31 @@ const passwordForm = ref({
 
 // 模板 Tab 激活
 const activeTemplateTab = ref('email')
+
+// AI 配置相关
+const useCustomPrompt = ref(false)
+const modelsLoading = ref(false)
+const modelList = ref([])
+
+const fetchModels = async () => {
+  if (!settingsForm.value.ai_api_url || !settingsForm.value.ai_api_key) {
+    ElMessage.warning('请先填写 API 地址和 API Key')
+    return
+  }
+  modelsLoading.value = true
+  try {
+    const resp = await api.post('/api/config-generator/fetch-models', {
+      api_url: settingsForm.value.ai_api_url,
+      api_key: settingsForm.value.ai_api_key
+    })
+    modelList.value = resp.data.models || []
+    ElMessage.success(`已获取 ${modelList.value.length} 个模型`)
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '获取模型列表失败')
+  } finally {
+    modelsLoading.value = false
+  }
+}
 
 // 报告间隔选项
 const reportIntervalOptions = [
@@ -136,6 +165,12 @@ const fetchSettings = async () => {
       settingsForm.value.status_report_enabled = d.status_report_enabled || false
       settingsForm.value.status_report_interval = d.status_report_interval || 360
       settingsForm.value.status_report_last_sent = d.status_report_last_sent || ''
+
+      // AI 配置
+      settingsForm.value.ai_api_url = d.ai_api_url || ''
+      settingsForm.value.ai_api_key = d.ai_api_key || ''
+      settingsForm.value.ai_model = d.ai_model || ''
+      settingsForm.value.ai_custom_prompt = d.ai_custom_prompt || ''
 
       // 模板字段
       for (const key of ALL_TEMPLATE_KEYS.value) {
@@ -684,6 +719,60 @@ onMounted(async () => {
                 <template #title>开启后系统会按设定间隔自动发送运行状态摘要</template>
               </el-alert>
             </div>
+          </el-tab-pane>
+
+          <!-- Tab 4: AI 配置 -->
+          <el-tab-pane label="AI 配置" name="ai">
+            <el-card shadow="never" style="margin-bottom: 16px">
+              <template #header><b>AI 智能分析配置</b></template>
+              <el-form :model="settingsForm" label-width="150px" style="max-width: 680px">
+                <el-form-item label="API 地址">
+                  <el-input v-model="settingsForm.ai_api_url" placeholder="如 https://api.deepseek.com/v1" />
+                </el-form-item>
+                <el-form-item label="API Key">
+                  <el-input v-model="settingsForm.ai_api_key" type="password" show-password placeholder="填入你的 API Key" />
+                </el-form-item>
+                <el-form-item label="模型">
+                  <div style="display: flex; gap: 10px; align-items: center; width: 100%">
+                    <el-select
+                      v-model="settingsForm.ai_model"
+                      filterable
+                      allow-create
+                      placeholder="选择或输入模型名称"
+                      style="flex: 1"
+                    >
+                      <el-option
+                        v-for="m in modelList"
+                        :key="m"
+                        :label="m"
+                        :value="m"
+                      />
+                    </el-select>
+                    <el-button :loading="modelsLoading" @click="fetchModels">拉取模型列表</el-button>
+                  </div>
+                </el-form-item>
+                <el-form-item label="自定义提示词">
+                  <div style="width: 100%">
+                    <div style="margin-bottom: 8px">
+                      <el-switch v-model="useCustomPrompt" active-text="开启" inactive-text="关闭" />
+                    </div>
+                    <el-input
+                      v-model="settingsForm.ai_custom_prompt"
+                      type="textarea"
+                      :rows="6"
+                      :disabled="!useCustomPrompt"
+                      placeholder="输入自定义提示词..."
+                    />
+                    <el-alert type="info" :closable="false" show-icon style="margin-top: 8px">
+                      <template #title>开启后使用自定义提示词替代内置提示词。关闭则使用内置的专业分析提示词。</template>
+                    </el-alert>
+                  </div>
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" @click="saveAllSettings">保存设置</el-button>
+                </el-form-item>
+              </el-form>
+            </el-card>
           </el-tab-pane>
         </el-tabs>
 

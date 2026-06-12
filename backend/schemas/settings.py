@@ -43,6 +43,12 @@ class SettingsBase(BaseModel):
     language: str = "zh-CN"
     extra: Optional[Dict[str, Any]] = None
 
+    # --- AI 配置（第三方 LLM API） ---
+    ai_api_url: str = ""
+    ai_api_key: str = ""
+    ai_model: str = ""
+    ai_custom_prompt: str = ""
+
     # --- 定时状态报告 ---
     status_report_enabled: bool = False
     status_report_interval: int = 0  # 0=关闭, 单位分钟

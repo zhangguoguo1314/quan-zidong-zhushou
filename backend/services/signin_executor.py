@@ -33,18 +33,26 @@ async def execute_signin(
         "auth_header_name": "Authorization",
         "success_field": "success",
         "message_field": "message",
-        "use_login_cookies": true  // 签到时复用登录返回的 cookies
+        "use_login_cookies": true,  // 签到时复用登录返回的 cookies
+        "proxy": "http://proxy.example.com:8080"  // 可选代理
     }
+
+    多账号隔离：每个账号的登录 cookies 存储在各自的 account 记录中，
+    签到执行时为每个账号创建独立的 httpx.AsyncClient，不复用连接。
     """
     result = {"success": False, "error": ""}
 
     try:
         config = api_config or {}
 
+        # 获取代理配置（按 account_id 隔离）
+        proxy = config.get("proxy", "") or None
+
         # Step 1: 登录获取 token（如果配置了 login_url）
         token = account_token or ""
         login_url = config.get("login_url", "").strip()
         login_cookies = {}
+        login_success = False
 
         if login_url:
             login_method = config.get("login_method", "POST").upper()
@@ -59,7 +67,11 @@ async def execute_signin(
             })
 
             try:
-                async with httpx.AsyncClient(timeout=30, verify=False, follow_redirects=True) as client:
+                # 为每个账号创建独立的 httpx.AsyncClient，不复用连接
+                async with httpx.AsyncClient(
+                    timeout=30, verify=False, follow_redirects=True,
+                    proxy=proxy,
+                ) as client:
                     if login_method == "POST":
                         if content_type == "application/x-www-form-urlencoded":
                             resp = await client.post(login_url, content=login_body_str, headers=login_headers)
@@ -72,7 +84,7 @@ async def execute_signin(
                     else:
                         resp = await client.get(login_url, headers=login_headers)
 
-                    # 保存登录 cookies
+                    # 保存登录 cookies（按 account_id 隔离）
                     login_cookies = dict(resp.cookies)
 
                     try:
@@ -90,6 +102,7 @@ async def execute_signin(
                     elif resp.status_code == 403:
                         result["error"] = _classify_login_error(resp.status_code, resp.text, "账号被禁止访问 (403 Forbidden)")
                     else:
+                        login_success = True
                         # 从响应中提取 token
                         token_field = config.get("token_field", "") or config.get("token_path", "")
                         if token_field:
@@ -104,7 +117,7 @@ async def execute_signin(
                             if extracted:
                                 token = str(extracted)
 
-                        # 如果 use_login_cookies=True 且登录成功，保存 cookies 到数据库
+                        # 如果 use_login_cookies=True 且登录成功，保存 cookies 到数据库（按 account_id 隔离）
                         use_login_cookies = config.get("use_login_cookies", False)
                         if use_login_cookies and login_cookies and account_id is not None and db is not None:
                             save_login_cookies(account_id, login_cookies, db)
@@ -118,13 +131,29 @@ async def execute_signin(
             except Exception as e:
                 result["error"] = f"登录过程异常: {str(e)[:300]}"
 
-            # 如果登录出错，直接返回
+            # 如果登录出错，尝试使用数据库中缓存的 cookies（按 account_id 隔离）
+            if result.get("error") and account_id is not None and db is not None:
+                cached_cookies = get_login_cookies(account_id, db)
+                if cached_cookies:
+                    print(f"[signin_executor] 账号 {account_id} 登录失败，尝试使用缓存的 cookies (共 {len(cached_cookies)} 个)")
+                    login_cookies = cached_cookies
+                    login_success = True
+                    result["error"] = ""  # 清除错误，尝试用缓存 cookies 继续
+
+            # 如果仍然有错误，直接返回
             if result.get("error"):
                 result["raw_response"] = resp.text[:500] if 'resp' in dir() else ""
                 result["status_code"] = resp.status_code if 'resp' in dir() else 0
                 return result
+        else:
+            # 没有 login_url，尝试从数据库加载缓存的 cookies
+            login_success = True
+            if account_id is not None and db is not None:
+                cached_cookies = get_login_cookies(account_id, db)
+                if cached_cookies:
+                    login_cookies = cached_cookies
 
-        # Step 2: 执行签到
+        # Step 2: 执行签到（为每个账号创建独立的 httpx.AsyncClient）
         signin_url = config.get("signin_url", "").strip() or site_url
         if not signin_url:
             return {"success": False, "error": "未配置签到 URL"}
@@ -165,11 +194,16 @@ async def execute_signin(
         })
 
         try:
-            async with httpx.AsyncClient(timeout=30, verify=False, follow_redirects=True) as client:
-                # 如果需要复用登录 cookies
+            # 为每个账号创建独立的 httpx.AsyncClient，不复用连接
+            async with httpx.AsyncClient(
+                timeout=30, verify=False, follow_redirects=True,
+                proxy=proxy,
+            ) as client:
+                # 如果需要复用登录 cookies（按 account_id 隔离）
                 use_login_cookies = config.get("use_login_cookies", False)
                 if use_login_cookies and login_cookies:
                     client.cookies.update(login_cookies)
+                    print(f"[signin_executor] 账号 {account_id} 使用 {len(login_cookies)} 个 cookies 进行签到")
 
                 # 如果用户提供了 account_cookie，也加上
                 if account_cookie:
@@ -276,10 +310,10 @@ async def execute_signin(
     return result
 
 
-# ============ Cookie 存储函数 ============
+# ============ Cookie 存储函数（按 account_id 隔离） ============
 
 def save_login_cookies(account_id: int, cookies_dict: dict, db):
-    """将登录 cookies 保存到数据库"""
+    """将登录 cookies 保存到数据库（按 account_id 隔离）"""
     try:
         from models.account import Account
         account = db.query(Account).filter(Account.id == account_id).first()
@@ -287,13 +321,13 @@ def save_login_cookies(account_id: int, cookies_dict: dict, db):
             account.login_cookies = json.dumps(cookies_dict, ensure_ascii=False)
             account.cookies_updated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
             db.commit()
-            print(f"[signin_executor] 已保存账号 {account_id} 的登录 cookies")
+            print(f"[signin_executor] 已保存账号 {account_id} 的登录 cookies (共 {len(cookies_dict)} 个)")
     except Exception as e:
-        print(f"[signin_executor] 保存 cookies 失败: {e}")
+        print(f"[signin_executor] 保存 cookies 失败 (账号 {account_id}): {e}")
 
 
 def get_login_cookies(account_id: int, db) -> dict:
-    """从数据库获取登录 cookies"""
+    """从数据库获取登录 cookies（按 account_id 隔离）"""
     try:
         from models.account import Account
         account = db.query(Account).filter(Account.id == account_id).first()
@@ -302,7 +336,7 @@ def get_login_cookies(account_id: int, db) -> dict:
             if isinstance(cookies, dict):
                 return cookies
     except Exception as e:
-        print(f"[signin_executor] 获取 cookies 失败: {e}")
+        print(f"[signin_executor] 获取 cookies 失败 (账号 {account_id}): {e}")
     return {}
 
 

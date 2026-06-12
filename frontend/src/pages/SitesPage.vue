@@ -41,6 +41,45 @@ const probing = ref(false)
 const probeResult = ref<any>(null)
 const probeError = ref('')
 
+// AI 分析模式
+const aiInput = ref('')
+const aiGenerating = ref(false)
+const aiMode = ref('probe') // 'probe' 或 'ai'
+const aiApiConfigured = ref(true) // 默认假设已配置
+
+const checkAiApiConfigured = async () => {
+  try {
+    const resp = await api.get('/api/settings')
+    const d = resp.data
+    aiApiConfigured.value = !!(d.ai_api_url && d.ai_api_key)
+  } catch {
+    aiApiConfigured.value = false
+  }
+}
+
+const handleAiGenerate = async () => {
+  if (!aiInput.value.trim()) {
+    ElMessage.warning('请输入网站信息')
+    return
+  }
+  aiGenerating.value = true
+  try {
+    const resp = await api.post('/api/config-generator/generate', {
+      user_input: aiInput.value.trim()
+    })
+    if (resp.data.success) {
+      probeResult.value = resp.data.config
+      ElMessage.success('AI 配置生成成功')
+    } else {
+      ElMessage.error(resp.data.message || '生成失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || 'AI 生成失败')
+  } finally {
+    aiGenerating.value = false
+  }
+}
+
 const handleProbe = async () => {
   if (!probeForm.value.url.trim()) {
     ElMessage.warning('请输入网站地址')
@@ -592,7 +631,7 @@ const sortedCategories = computed(() => {
 })
 
 onMounted(async () => {
-  await Promise.all([fetchSites(), fetchPresets(), fetchCategories()])
+  await Promise.all([fetchSites(), fetchPresets(), fetchCategories(), checkAiApiConfigured()])
   await fetchSitesGrouped()
 })
 </script>
@@ -634,8 +673,14 @@ onMounted(async () => {
       <div class="content-card" style="margin-bottom: 16px">
         <div class="card-title-row">
           <h2 class="card-title">AI 智能配置生成器</h2>
+          <el-radio-group v-model="aiMode" size="small">
+            <el-radio-button value="probe">自动探测</el-radio-button>
+            <el-radio-button value="ai">AI 分析</el-radio-button>
+          </el-radio-group>
         </div>
-        <div class="probe-form">
+
+        <!-- 自动探测模式 -->
+        <div v-if="aiMode === 'probe'" class="probe-form">
           <el-form :inline="false" label-width="100px">
             <el-form-item label="网站地址" required>
               <el-input v-model="probeForm.url" placeholder="https://example.com" style="width: 100%" />
@@ -650,6 +695,28 @@ onMounted(async () => {
               <el-button type="primary" :loading="probing" @click="handleProbe">开始探测</el-button>
             </el-form-item>
           </el-form>
+        </div>
+
+        <!-- AI 分析模式 -->
+        <div v-if="aiMode === 'ai'">
+          <el-alert
+            v-if="!aiApiConfigured"
+            type="warning"
+            title="请先在设置页配置 AI API 地址和 Key"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 16px"
+          />
+          <el-input
+            v-model="aiInput"
+            type="textarea"
+            :rows="8"
+            placeholder="粘贴网站信息、F12 截图描述、HAR 文件内容等..."
+            style="margin-bottom: 12px"
+          />
+          <el-button type="primary" :loading="aiGenerating" :disabled="!aiApiConfigured" @click="handleAiGenerate">
+            AI 生成配置
+          </el-button>
         </div>
 
         <!-- 探测成功结果 -->

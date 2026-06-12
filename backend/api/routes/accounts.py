@@ -213,7 +213,8 @@ def update_account(
 
     update_data = account_data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
-        setattr(account, key, value)
+        if value is not None:  # 关键：不要跳过空字符串的 password，但跳过 None
+            setattr(account, key, value)
     db.commit()
     db.refresh(account)
     return account

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, Text
 from sqlalchemy.sql import func
 from core.database import Base
 
@@ -31,6 +31,12 @@ class UserSettings(Base):
     display_name = Column(String(100), default="")
     timezone = Column(String(50), default="Asia/Shanghai")
     language = Column(String(20), default="zh-CN")
+
+    # --- AI 配置（第三方 LLM API） ---
+    ai_api_url = Column(String(500), default="")
+    ai_api_key = Column(String(500), default="")
+    ai_model = Column(String(200), default="")
+    ai_custom_prompt = Column(Text, default="")
 
     extra = Column(JSON, nullable=True)
 

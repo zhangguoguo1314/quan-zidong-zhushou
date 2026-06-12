@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import logging
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,8 +8,11 @@ from fastapi.responses import FileResponse
 from sqlalchemy import text, inspect
 
 from core.database import engine, Base, SessionLocal
+from core.config import settings
 from api.routes import auth, sites, accounts, tasks, logs, settings as settings_routes, config_generator
 from tasks.scheduler import start_scheduler, stop_scheduler, scheduler
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Account-Auto-Sign API", version="2.0.0")
 
@@ -57,9 +62,39 @@ def _migrate_database():
         print(f"[migrate] 数据库迁移失败: {e}")
 
 
+def check_permissions():
+    """检查关键目录和文件的读写权限"""
+    # 检查数据库目录
+    db_url = getattr(settings, "DATABASE_URL", "") or "sqlite:///./data.db"
+    db_path = db_url.replace("sqlite:///", "").replace("sqlite://", "")
+    if db_path:
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            try:
+                os.makedirs(db_dir, exist_ok=True)
+                logger.info(f"[permission] 创建数据库目录: {db_dir}")
+            except Exception as e:
+                logger.error(f"[permission] 无法创建数据库目录 {db_dir}: {e}")
+
+    # 检查 static 目录
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    if os.path.exists(static_dir):
+        test_file = os.path.join(static_dir, ".permission_test")
+        try:
+            with open(test_file, "w") as f:
+                f.write("test")
+            os.remove(test_file)
+            logger.info(f"[permission] static 目录读写正常: {static_dir}")
+        except Exception as e:
+            logger.error(f"[permission] static 目录权限异常: {e}")
+
+    logger.info("[permission] 文件权限检查完成")
+
+
 @app.on_event("startup")
 def on_startup():
     _migrate_database()
+    check_permissions()
 
     if not scheduler.running:
         start_scheduler()
