@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from '@/i18n'
 import api from '@/api'
 
+const { currentLang, setLang, t } = useI18n()
 const loading = ref(false)
 const dialogVisible = ref(false)
 const editingAccount = ref<any>(null)
@@ -170,15 +172,23 @@ onMounted(() => {
 <template>
   <div class="dashboard">
     <aside class="sidebar">
-      <div class="logo"><h2>全自动助手</h2></div>
+      <div class="logo"><h2>{{ t('app.title') }}</h2></div>
       <nav class="nav-menu">
-        <router-link to="/" class="nav-item">仪表盘</router-link>
-        <router-link to="/sites" class="nav-item">网站管理</router-link>
-        <router-link to="/accounts" class="nav-item active">账号管理</router-link>
-        <router-link to="/tasks" class="nav-item">任务管理</router-link>
-        <router-link to="/logs" class="nav-item">签到日志</router-link>
-        <router-link to="/settings" class="nav-item">设置</router-link>
+        <router-link to="/" class="nav-item">{{ t('nav.dashboard') }}</router-link>
+        <router-link to="/sites" class="nav-item">{{ t('nav.sites') }}</router-link>
+        <router-link to="/accounts" class="nav-item active">{{ t('nav.accounts') }}</router-link>
+        <router-link to="/tasks" class="nav-item">{{ t('nav.tasks') }}</router-link>
+        <router-link to="/logs" class="nav-item">{{ t('nav.logs') }}</router-link>
+        <router-link to="/settings" class="nav-item">{{ t('nav.settings') }}</router-link>
       </nav>
+      <!-- 语言切换 -->
+      <div class="lang-switch">
+        <el-select v-model="currentLang" size="small" style="width: 100px" @change="(val: any) => setLang(val)">
+          <el-option label="中文" value="zh" />
+          <el-option label="English" value="en" />
+          <el-option label="日本語" value="ja" />
+        </el-select>
+      </div>
     </aside>
 
     <main class="main-content">

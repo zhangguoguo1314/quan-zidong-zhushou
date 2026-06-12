@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.orm import Session
 
 from core.database import SessionLocal
@@ -266,6 +267,9 @@ def start_scheduler():
         if not scheduler.running:
             scheduler.start()
         print(f"[scheduler] 调度器启动，已加载 {count} 个定时任务")
+
+        # 加载定时状态报告任务
+        load_status_report_jobs()
     except Exception as e:
         print(f"[scheduler] 启动失败: {e}")
     finally:
@@ -280,3 +284,95 @@ def stop_scheduler():
             print("[scheduler] 调度器已停止")
     except Exception as e:
         print(f"[scheduler] 停止失败: {e}")
+
+
+# ==============================================================
+#  定时状态报告
+# ==============================================================
+def _run_status_report_in_thread(user_id: int):
+    """在独立线程中执行状态报告发送。"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_do_send_status_report(user_id))
+    finally:
+        loop.close()
+
+
+async def _do_send_status_report(user_id: int):
+    """执行状态报告发送的 async 逻辑。"""
+    from models.settings import UserSettings
+    from services.notification import send_status_report
+
+    db = SessionLocal()
+    try:
+        settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
+        if not settings:
+            print(f"[status_report] 用户 {user_id} 无设置，跳过")
+            return
+        if not settings.status_report_enabled:
+            print(f"[status_report] 用户 {user_id} 状态报告已关闭，跳过")
+            return
+        await send_status_report(settings, db)
+        print(f"[status_report] 用户 {user_id} 状态报告发送完成")
+    except Exception as e:
+        print(f"[status_report] 用户 {user_id} 状态报告发送失败: {e}")
+    finally:
+        db.close()
+
+
+def run_status_report(user_id: int):
+    """调度器触发入口 - 同步函数。"""
+    import threading
+    thread = threading.Thread(target=_run_status_report_in_thread, args=(user_id,), daemon=True)
+    thread.start()
+    thread.join(timeout=120)
+
+
+def add_status_report_job(user_id: int, interval_minutes: int):
+    """添加定时状态报告任务到调度器。"""
+    try:
+        job_id = f"status_report_{user_id}"
+        trigger = IntervalTrigger(minutes=interval_minutes)
+        scheduler.add_job(
+            run_status_report,
+            trigger=trigger,
+            args=[user_id],
+            id=job_id,
+            replace_existing=True,
+            misfire_grace_time=3600,
+            coalesce=True,
+        )
+        print(f"[scheduler] 已注册状态报告任务 (用户 {user_id}, 间隔 {interval_minutes} 分钟)")
+    except Exception as e:
+        print(f"[scheduler] 注册状态报告任务失败 (用户 {user_id}): {e}")
+
+
+def remove_status_report_job(user_id: int):
+    """移除定时状态报告任务。"""
+    try:
+        job_id = f"status_report_{user_id}"
+        scheduler.remove_job(job_id=job_id)
+        print(f"[scheduler] 已移除状态报告任务 (用户 {user_id})")
+    except Exception as e:
+        print(f"[scheduler] 移除状态报告任务失败 (用户 {user_id}): {e}")
+
+
+def load_status_report_jobs():
+    """扫描所有用户设置，为启用了状态报告的用户添加定时任务。"""
+    from models.settings import UserSettings
+
+    db = SessionLocal()
+    try:
+        all_settings = db.query(UserSettings).filter(
+            UserSettings.status_report_enabled == True,
+            UserSettings.status_report_interval > 0,
+        ).all()
+        for settings in all_settings:
+            add_status_report_job(settings.user_id, settings.status_report_interval)
+        if all_settings:
+            print(f"[scheduler] 已加载 {len(all_settings)} 个状态报告定时任务")
+    except Exception as e:
+        print(f"[scheduler] 加载状态报告任务失败: {e}")
+    finally:
+        db.close()

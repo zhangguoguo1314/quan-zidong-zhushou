@@ -43,6 +43,11 @@ class SettingsBase(BaseModel):
     language: str = "zh-CN"
     extra: Optional[Dict[str, Any]] = None
 
+    # --- 定时状态报告 ---
+    status_report_enabled: bool = False
+    status_report_interval: int = 0  # 0=关闭, 单位分钟
+    status_report_last_sent: str = ""
+
     # --- 邮件模板 ---
     tpl_email_success_subject: str = "[签到成功] {account_name} @ {site_name}"
     tpl_email_success_body: str = (

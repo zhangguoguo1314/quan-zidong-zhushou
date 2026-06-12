@@ -4,11 +4,13 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
+import { useI18n } from '@/i18n'
 import api from '@/api'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
+const { currentLang, setLang, t } = useI18n()
 
 const loading = ref(false)
 
@@ -71,28 +73,36 @@ onMounted(() => {
   <div class="dashboard">
     <aside class="sidebar">
       <div class="logo">
-        <h2>Auto-Sign</h2>
+        <h2>{{ t('app.title') }}</h2>
       </div>
       <nav class="nav-menu">
         <router-link to="/" class="nav-item active">
-          <span>Dashboard</span>
+          <span>{{ t('nav.dashboard') }}</span>
         </router-link>
         <router-link to="/sites" class="nav-item">
-          <span>Sites</span>
+          <span>{{ t('nav.sites') }}</span>
         </router-link>
         <router-link to="/accounts" class="nav-item">
-          <span>Accounts</span>
+          <span>{{ t('nav.accounts') }}</span>
         </router-link>
         <router-link to="/tasks" class="nav-item">
-          <span>Tasks</span>
+          <span>{{ t('nav.tasks') }}</span>
         </router-link>
         <router-link to="/logs" class="nav-item">
-          <span>Logs</span>
+          <span>{{ t('nav.logs') }}</span>
         </router-link>
         <router-link to="/settings" class="nav-item">
-          <span>Settings</span>
+          <span>{{ t('nav.settings') }}</span>
         </router-link>
       </nav>
+      <!-- 语言切换 -->
+      <div class="lang-switch">
+        <el-select v-model="currentLang" size="small" style="width: 100px" @change="(val: any) => setLang(val)">
+          <el-option label="中文" value="zh" />
+          <el-option label="English" value="en" />
+          <el-option label="日本語" value="ja" />
+        </el-select>
+      </div>
       <div class="user-info">
         <span>{{ authStore.user?.email }}</span>
         <el-button link @click="handleLogout">Logout</el-button>
@@ -101,7 +111,7 @@ onMounted(() => {
 
     <main class="main-content">
       <header class="page-header">
-        <h1>Dashboard</h1>
+        <h1>{{ t('dashboard.title') }}</h1>
       </header>
 
       <div class="stats-grid">

@@ -345,6 +345,34 @@ def test_wechat_bot(
 # ==============================================================
 #  其他
 # ==============================================================
+@router.post("/send-status-report")
+def send_status_report(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """手动触发一次状态报告发送。"""
+    import asyncio
+    from services.notification import send_status_report as do_send_status_report
+
+    settings = _get_or_create_settings(db, current_user.id)
+
+    # 检查是否至少启用了邮件或企业微信
+    if not settings.email_enabled and not settings.wechat_bot_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请先启用邮件通知或企业微信机器人通知",
+        )
+
+    try:
+        asyncio.run(do_send_status_report(settings, db))
+        return {"success": True, "message": "状态报告已发送"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"发送状态报告失败: {e}",
+        )
+
+
 @router.post("/change-password")
 def change_password(
     data: PasswordChangeRequest,

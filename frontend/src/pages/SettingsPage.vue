@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from '@/i18n'
 import api from '@/api'
+
+const { currentLang, setLang, t } = useI18n()
 
 // ============= 状态 =============
 const loading = ref(false)
@@ -11,6 +14,7 @@ const wechatLoading = ref(false)
 const testWechatLoading = ref(false)
 const templatesLoading = ref(false)
 const previewLoading = ref(false)
+const reportLoading = ref(false)
 const userInfo = ref<any>(null)
 
 // 基本设置
@@ -32,6 +36,9 @@ const settingsForm = ref({
   wechat_bot_notify_on_stable: false,
   wechat_bot_notify_on_system_error: true,
   display_name: '',
+  status_report_enabled: false,
+  status_report_interval: 360,
+  status_report_last_sent: '',
 })
 
 // 模板字段
@@ -74,6 +81,20 @@ const passwordForm = ref({
   confirm_password: '',
 })
 
+// 模板 Tab 激活
+const activeTemplateTab = ref('email')
+
+// 报告间隔选项
+const reportIntervalOptions = [
+  { label: '30分钟', value: 30 },
+  { label: '1小时', value: 60 },
+  { label: '2小时', value: 120 },
+  { label: '6小时', value: 360 },
+  { label: '12小时', value: 720 },
+  { label: '24小时', value: 1440 },
+  { label: '48小时', value: 2880 },
+]
+
 // ============= 计算 =============
 const ALL_TEMPLATE_KEYS = computed(() => Object.keys(templates.value))
 
@@ -110,6 +131,11 @@ const fetchSettings = async () => {
       settingsForm.value.wechat_bot_notify_on_stable = d.wechat_bot_notify_on_stable || false
       settingsForm.value.wechat_bot_notify_on_system_error = d.wechat_bot_notify_on_system_error !== false
       settingsForm.value.display_name = d.display_name || ''
+
+      // 定时状态报告
+      settingsForm.value.status_report_enabled = d.status_report_enabled || false
+      settingsForm.value.status_report_interval = d.status_report_interval || 360
+      settingsForm.value.status_report_last_sent = d.status_report_last_sent || ''
 
       // 模板字段
       for (const key of ALL_TEMPLATE_KEYS.value) {
@@ -316,6 +342,22 @@ const resetAllTemplates = async () => {
   } catch (_) { /* 用户取消 */ }
 }
 
+// ---- 发送测试状态报告 ----
+const sendTestReport = async () => {
+  reportLoading.value = true
+  try {
+    const resp = await api.post('/api/settings/send-status-report')
+    if (resp.data.success) {
+      ElMessage.success('状态报告已发送')
+      settingsForm.value.status_report_last_sent = new Date().toLocaleString()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '发送失败')
+  } finally {
+    reportLoading.value = false
+  }
+}
+
 // ---- 修改密码 ----
 const changePassword = async () => {
   if (!passwordForm.value.current_password) {
@@ -377,6 +419,38 @@ const BOT_TEMPLATE_KEYS = [
   'tpl_bot_success', 'tpl_bot_failure', 'tpl_bot_stable', 'tpl_bot_error',
 ]
 
+// 邮件模板按场景分组（用于 el-collapse）
+const emailScenarios = [
+  {
+    name: 'success',
+    title: '签到成功',
+    keys: ['tpl_email_success_subject', 'tpl_email_success_body'],
+  },
+  {
+    name: 'failure',
+    title: '签到失败',
+    keys: ['tpl_email_failure_subject', 'tpl_email_failure_body'],
+  },
+  {
+    name: 'stable',
+    title: '稳定运行',
+    keys: ['tpl_email_stable_subject', 'tpl_email_stable_body'],
+  },
+  {
+    name: 'error',
+    title: '系统异常',
+    keys: ['tpl_email_error_subject', 'tpl_email_error_body'],
+  },
+]
+
+// 企业微信模板按场景分组
+const botScenarios = [
+  { name: 'success', title: '签到成功', keys: ['tpl_bot_success'] },
+  { name: 'failure', title: '签到失败', keys: ['tpl_bot_failure'] },
+  { name: 'stable', title: '稳定运行', keys: ['tpl_bot_stable'] },
+  { name: 'error', title: '系统异常', keys: ['tpl_bot_error'] },
+]
+
 onMounted(async () => {
   await Promise.all([fetchUser(), fetchSettings(), fetchDefaults()])
 })
@@ -385,15 +459,23 @@ onMounted(async () => {
 <template>
   <div class="dashboard">
     <aside class="sidebar">
-      <div class="logo"><h2>全自动助手</h2></div>
+      <div class="logo"><h2>{{ t('app.title') }}</h2></div>
       <nav class="nav-menu">
-        <router-link to="/" class="nav-item">仪表盘</router-link>
-        <router-link to="/sites" class="nav-item">网站管理</router-link>
-        <router-link to="/accounts" class="nav-item">账号管理</router-link>
-        <router-link to="/tasks" class="nav-item">任务管理</router-link>
-        <router-link to="/logs" class="nav-item">签到日志</router-link>
-        <router-link to="/settings" class="nav-item active">设置</router-link>
+        <router-link to="/" class="nav-item">{{ t('nav.dashboard') }}</router-link>
+        <router-link to="/sites" class="nav-item">{{ t('nav.sites') }}</router-link>
+        <router-link to="/accounts" class="nav-item">{{ t('nav.accounts') }}</router-link>
+        <router-link to="/tasks" class="nav-item">{{ t('nav.tasks') }}</router-link>
+        <router-link to="/logs" class="nav-item">{{ t('nav.logs') }}</router-link>
+        <router-link to="/settings" class="nav-item active">{{ t('nav.settings') }}</router-link>
       </nav>
+      <!-- 语言切换 -->
+      <div class="lang-switch">
+        <el-select v-model="currentLang" size="small" style="width: 100px" @change="(val: any) => setLang(val)">
+          <el-option label="中文" value="zh" />
+          <el-option label="English" value="en" />
+          <el-option label="日本語" value="ja" />
+        </el-select>
+      </div>
     </aside>
 
     <main class="main-content">
@@ -494,13 +576,14 @@ onMounted(async () => {
         </el-form>
       </div>
 
-      <!-- 消息模板编辑器 -->
+      <!-- 消息模板编辑器（Tabs 分组） -->
       <div class="content-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
-          <h2 class="card-title" style="margin: 0">消息模板（邮件）</h2>
+          <h2 class="card-title" style="margin: 0">消息模板</h2>
           <el-button size="small" @click="resetAllTemplates">恢复所有模板为默认</el-button>
         </div>
 
+        <!-- 占位符说明 -->
         <el-alert type="success" :closable="false" show-icon style="margin-bottom: 16px">
           <template #title>
             <div>
@@ -512,52 +595,97 @@ onMounted(async () => {
           </template>
         </el-alert>
 
-        <div class="template-grid">
-          <div v-for="key in EMAIL_TEMPLATE_KEYS" :key="key" class="template-item">
-            <div class="template-header">
-              <div>
-                <b>{{ TEMPLATE_META[key]?.title }}</b>
-                <div class="hint">{{ TEMPLATE_META[key]?.desc }}</div>
-              </div>
-              <div>
-                <el-button size="small" @click="openPreview(key, 'success')">预览</el-button>
-                <el-button size="small" text type="danger" @click="resetOneTemplate(key)">恢复默认</el-button>
-              </div>
-            </div>
-            <el-input
-              v-model="(templates as any)[key]"
-              :type="TEMPLATE_META[key]?.type === 'body' ? 'textarea' : 'text'"
-              :rows="TEMPLATE_META[key]?.type === 'body' ? 6 : 1"
-              :placeholder="templateDefaults[key] || '输入模板内容，使用 {变量名} 作为占位符'"
-            />
-          </div>
-        </div>
-      </div>
+        <el-tabs v-model="activeTemplateTab">
+          <!-- Tab 1: 邮件模板 -->
+          <el-tab-pane label="邮件模板" name="email">
+            <el-collapse>
+              <el-collapse-item v-for="scenario in emailScenarios" :key="scenario.name" :title="scenario.title" :name="scenario.name">
+                <div v-for="key in scenario.keys" :key="key" style="margin-bottom: 16px">
+                  <div class="template-header">
+                    <div>
+                      <b>{{ TEMPLATE_META[key]?.title }}</b>
+                      <div class="hint">{{ TEMPLATE_META[key]?.desc }}</div>
+                    </div>
+                    <div>
+                      <el-button size="small" @click="openPreview(key, scenario.name)">预览</el-button>
+                      <el-button size="small" text type="danger" @click="resetOneTemplate(key)">恢复默认</el-button>
+                    </div>
+                  </div>
+                  <el-input
+                    v-model="(templates as any)[key]"
+                    :type="TEMPLATE_META[key]?.type === 'body' ? 'textarea' : 'text'"
+                    :rows="TEMPLATE_META[key]?.type === 'body' ? 6 : 1"
+                    :placeholder="templateDefaults[key] || '输入模板内容，使用 {变量名} 作为占位符'"
+                  />
+                </div>
+              </el-collapse-item>
+            </el-collapse>
+          </el-tab-pane>
 
-      <!-- 微信机器人模板 -->
-      <div class="content-card">
-        <h2 class="card-title">消息模板（企业微信 · Markdown）</h2>
+          <!-- Tab 2: 企业微信模板 -->
+          <el-tab-pane label="企业微信模板" name="wechat">
+            <el-collapse>
+              <el-collapse-item v-for="scenario in botScenarios" :key="scenario.name" :title="scenario.title" :name="scenario.name">
+                <div v-for="key in scenario.keys" :key="key">
+                  <div class="template-header">
+                    <div>
+                      <b>{{ TEMPLATE_META[key]?.title }}</b>
+                      <div class="hint">{{ TEMPLATE_META[key]?.desc }}</div>
+                    </div>
+                    <div>
+                      <el-button size="small" @click="openPreview(key, scenario.name)">预览</el-button>
+                      <el-button size="small" text type="danger" @click="resetOneTemplate(key)">恢复默认</el-button>
+                    </div>
+                  </div>
+                  <el-input
+                    v-model="(templates as any)[key]"
+                    type="textarea"
+                    :rows="8"
+                    :placeholder="templateDefaults[key] || '输入 Markdown 模板内容，使用 {变量名} 作为占位符'"
+                  />
+                </div>
+              </el-collapse-item>
+            </el-collapse>
+          </el-tab-pane>
 
-        <div class="template-grid">
-          <div v-for="key in BOT_TEMPLATE_KEYS" :key="key" class="template-item">
-            <div class="template-header">
-              <div>
-                <b>{{ TEMPLATE_META[key]?.title }}</b>
-                <div class="hint">{{ TEMPLATE_META[key]?.desc }}</div>
-              </div>
-              <div>
-                <el-button size="small" @click="openPreview(key, key.includes('stable') ? 'stable' : key.includes('error') ? 'error' : 'success')">预览</el-button>
-                <el-button size="small" text type="danger" @click="resetOneTemplate(key)">恢复默认</el-button>
-              </div>
+          <!-- Tab 3: 定时状态报告 -->
+          <el-tab-pane label="定时状态报告" name="report">
+            <div class="report-section">
+              <el-form :model="settingsForm" label-width="160px" style="max-width: 600px">
+                <el-form-item label="开启定时状态报告">
+                  <el-switch v-model="settingsForm.status_report_enabled" />
+                </el-form-item>
+
+                <el-form-item label="报告间隔">
+                  <el-select v-model="settingsForm.status_report_interval" placeholder="选择报告间隔" style="width: 200px">
+                    <el-option
+                      v-for="opt in reportIntervalOptions"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item label="上次发送时间">
+                  <el-descriptions :column="1" border size="small">
+                    <el-descriptions-item label="Last Sent">
+                      {{ settingsForm.status_report_last_sent || '从未发送' }}
+                    </el-descriptions-item>
+                  </el-descriptions>
+                </el-form-item>
+
+                <el-form-item>
+                  <el-button type="primary" :loading="reportLoading" @click="sendTestReport">立即发送测试报告</el-button>
+                </el-form-item>
+              </el-form>
+
+              <el-alert type="info" :closable="false" show-icon style="margin-top: 16px">
+                <template #title>开启后系统会按设定间隔自动发送运行状态摘要</template>
+              </el-alert>
             </div>
-            <el-input
-              v-model="(templates as any)[key]"
-              type="textarea"
-              :rows="8"
-              :placeholder="templateDefaults[key] || '输入 Markdown 模板内容，使用 {变量名} 作为占位符'"
-            />
-          </div>
-        </div>
+          </el-tab-pane>
+        </el-tabs>
 
         <div style="margin-top: 16px; display: flex; justify-content: flex-end">
           <el-button type="primary" :loading="templatesLoading" @click="saveAllSettings">保存全部设置（含模板）</el-button>
@@ -641,8 +769,9 @@ onMounted(async () => {
 code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 12px; font-family: monospace; }
 
 /* 模板编辑器 */
-.template-grid { display: flex; flex-direction: column; gap: 24px; }
-.template-item { border: 1px solid #ebeef5; border-radius: 8px; padding: 16px; background: #fafbfc; }
 .template-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
 .preview-rendered pre { font-size: 13px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+
+/* 报告区域 */
+.report-section { padding: 8px 0; }
 </style>

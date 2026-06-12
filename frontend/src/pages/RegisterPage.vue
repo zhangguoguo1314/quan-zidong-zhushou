@@ -3,10 +3,12 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from '@/i18n'
 import api from '@/api'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { currentLang, setLang, t } = useI18n()
 
 const form = ref({
   email: '',
@@ -61,14 +63,14 @@ const handleRegister = async () => {
 <template>
   <div class="register-container">
     <div class="register-card">
-      <h1 class="title">Create Account</h1>
-      <p class="subtitle">Start automating your sign-ins</p>
+      <h1 class="title">{{ t('login.register') }}</h1>
+      <p class="subtitle">{{ t('login.subtitle') }}</p>
 
       <el-form :model="form" class="register-form">
         <el-form-item>
           <el-input
             v-model="form.email"
-            placeholder="Email"
+            :placeholder="t('login.email')"
             type="email"
             size="large"
             prefix-icon="Message"
@@ -78,7 +80,7 @@ const handleRegister = async () => {
         <el-form-item>
           <el-input
             v-model="form.password"
-            placeholder="Password"
+            :placeholder="t('login.password')"
             type="password"
             size="large"
             prefix-icon="Lock"
@@ -88,7 +90,7 @@ const handleRegister = async () => {
         <el-form-item>
           <el-input
             v-model="form.confirmPassword"
-            placeholder="Confirm Password"
+            :placeholder="t('login.password')"
             type="password"
             size="large"
             prefix-icon="Lock"
@@ -104,7 +106,7 @@ const handleRegister = async () => {
             @click="handleRegister"
             class="register-button"
           >
-            Create Account
+            {{ t('login.register') }}
           </el-button>
         </el-form-item>
       </el-form>

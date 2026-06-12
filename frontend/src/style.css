@@ -15,3 +15,120 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ====== 全局响应式 ====== */
+@media (max-width: 768px) {
+  /* 侧边栏变为顶部导航 */
+  .dashboard {
+    flex-direction: column !important;
+  }
+  .sidebar {
+    width: 100% !important;
+    position: fixed;
+    bottom: 0;
+    top: auto;
+    height: auto !important;
+    flex-direction: row !important;
+    z-index: 100;
+    padding: 0 !important;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .sidebar .logo {
+    display: none !important;
+  }
+  .sidebar .nav-menu {
+    display: flex !important;
+    flex-direction: row !important;
+    padding: 0 !important;
+    overflow-x: auto;
+    gap: 0;
+  }
+  .sidebar .nav-item {
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+    white-space: nowrap;
+    text-align: center;
+    flex: 1;
+    min-width: 0;
+  }
+  .sidebar .lang-switch {
+    display: none !important;
+  }
+  .main-content {
+    padding: 12px !important;
+    padding-bottom: 70px !important; /* 为底部导航留空间 */
+  }
+  .page-header h1 {
+    font-size: 20px !important;
+  }
+  .content-card {
+    padding: 16px !important;
+    border-radius: 8px !important;
+  }
+  /* 表单响应式 */
+  .el-form-item__label {
+    float: none !important;
+    display: block !important;
+    text-align: left !important;
+    padding-bottom: 4px !important;
+    width: auto !important;
+  }
+  .el-form-item__content {
+    margin-left: 0 !important;
+  }
+  .el-form--label-top .el-form-item__label {
+    padding: 0 !important;
+  }
+  /* 表格响应式 */
+  .el-table {
+    font-size: 12px !important;
+  }
+  /* 弹窗响应式 */
+  .el-dialog {
+    width: 95% !important;
+    margin: 10px auto !important;
+  }
+  /* 模板编辑器响应式 */
+  .template-header {
+    flex-direction: column !important;
+    gap: 8px;
+  }
+  .template-header > div:last-child {
+    align-self: flex-end;
+  }
+  /* info-grid 响应式 */
+  .info-grid {
+    grid-template-columns: 1fr !important;
+  }
+  /* 登录页响应式 */
+  .login-card {
+    width: 90% !important;
+    padding: 24px !important;
+    margin: 12px !important;
+  }
+  .login-card .title {
+    font-size: 22px !important;
+  }
+  /* 按钮组响应式 */
+  .el-button-group {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar .nav-item {
+    padding: 8px 8px !important;
+    font-size: 11px !important;
+  }
+  .main-content {
+    padding: 8px !important;
+    padding-bottom: 60px !important;
+  }
+  .content-card {
+    padding: 12px !important;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 8px;
+  }
+}

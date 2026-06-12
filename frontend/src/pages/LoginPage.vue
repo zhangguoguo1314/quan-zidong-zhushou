@@ -3,10 +3,12 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from '@/i18n'
 import api from '@/api'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { currentLang, setLang, t } = useI18n()
 
 const form = ref({
   email: '',
@@ -41,14 +43,14 @@ const handleLogin = async () => {
 <template>
   <div class="login-container">
     <div class="login-card">
-      <h1 class="title">Account Auto-Sign</h1>
-      <p class="subtitle">Sign in to your account</p>
+      <h1 class="title">{{ t('login.title') }}</h1>
+      <p class="subtitle">{{ t('login.subtitle') }}</p>
 
       <el-form :model="form" class="login-form">
         <el-form-item>
           <el-input
             v-model="form.email"
-            placeholder="Email"
+            :placeholder="t('login.email')"
             type="email"
             size="large"
             prefix-icon="User"
@@ -58,7 +60,7 @@ const handleLogin = async () => {
         <el-form-item>
           <el-input
             v-model="form.password"
-            placeholder="Password"
+            :placeholder="t('login.password')"
             type="password"
             size="large"
             prefix-icon="Lock"
@@ -74,14 +76,14 @@ const handleLogin = async () => {
             @click="handleLogin"
             class="login-button"
           >
-            Sign In
+            {{ t('login.submit') }}
           </el-button>
         </el-form-item>
       </el-form>
 
       <div class="register-link">
-        Don't have an account?
-        <router-link to="/register">Register</router-link>
+        {{ t('login.noAccount') }}
+        <router-link to="/register">{{ t('login.register') }}</router-link>
       </div>
     </div>
   </div>

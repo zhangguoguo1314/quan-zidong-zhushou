@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAppStore } from '@/stores/app'
+import { useI18n } from '@/i18n'
 import api from '@/api'
 
 const appStore = useAppStore()
+const { currentLang, setLang, t } = useI18n()
 const loading = ref(false)
 
 const filters = ref({
@@ -71,15 +73,23 @@ onMounted(() => {
 <template>
   <div class="dashboard">
     <aside class="sidebar">
-      <div class="logo"><h2>Auto-Sign</h2></div>
+      <div class="logo"><h2>{{ t('app.title') }}</h2></div>
       <nav class="nav-menu">
-        <router-link to="/" class="nav-item">Dashboard</router-link>
-        <router-link to="/sites" class="nav-item">Sites</router-link>
-        <router-link to="/accounts" class="nav-item">Accounts</router-link>
-        <router-link to="/tasks" class="nav-item">Tasks</router-link>
-        <router-link to="/logs" class="nav-item active">Logs</router-link>
-        <router-link to="/settings" class="nav-item">Settings</router-link>
+        <router-link to="/" class="nav-item">{{ t('nav.dashboard') }}</router-link>
+        <router-link to="/sites" class="nav-item">{{ t('nav.sites') }}</router-link>
+        <router-link to="/accounts" class="nav-item">{{ t('nav.accounts') }}</router-link>
+        <router-link to="/tasks" class="nav-item">{{ t('nav.tasks') }}</router-link>
+        <router-link to="/logs" class="nav-item active">{{ t('nav.logs') }}</router-link>
+        <router-link to="/settings" class="nav-item">{{ t('nav.settings') }}</router-link>
       </nav>
+      <!-- 语言切换 -->
+      <div class="lang-switch">
+        <el-select v-model="currentLang" size="small" style="width: 100px" @change="(val: any) => setLang(val)">
+          <el-option label="中文" value="zh" />
+          <el-option label="English" value="en" />
+          <el-option label="日本語" value="ja" />
+        </el-select>
+      </div>
     </aside>
 
     <main class="main-content">

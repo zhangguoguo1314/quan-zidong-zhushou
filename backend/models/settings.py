@@ -34,6 +34,11 @@ class UserSettings(Base):
 
     extra = Column(JSON, nullable=True)
 
+    # --- 定时状态报告 ---
+    status_report_enabled = Column(Boolean, default=False)
+    status_report_interval = Column(Integer, default=0)  # 0=关闭, 单位分钟
+    status_report_last_sent = Column(String(50), default="")
+
     tpl_email_success_subject = Column(String(200), default="[签到成功] {account_name} @ {site_name}")
     tpl_email_success_body = Column(String(5000), default="您好，\n\n签到任务已顺利完成。\n\n【账号】{account_name}\n【站点】{site_name}\n【结果】{message}\n【时间】{time}\n\n--\n自动签到系统 {display_name}")
 
