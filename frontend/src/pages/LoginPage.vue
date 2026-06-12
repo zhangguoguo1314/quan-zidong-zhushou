@@ -18,7 +18,7 @@ const loading = ref(false)
 
 const handleLogin = async () => {
   if (!form.value.email || !form.value.password) {
-    ElMessage.warning(t('login.fillAll') || 'Please fill in all fields')
+    ElMessage.warning(t('login.fillAll') || '请填写所有字段')
     return
   }
 
@@ -37,7 +37,7 @@ const handleLogin = async () => {
     // 4. 设置 auth store
     authStore.setAuth(access_token, userResponse.data)
 
-    ElMessage.success(t('common.success') || 'Login successful')
+    ElMessage.success(t('common.success') || '登录成功')
     router.push('/')
   } catch (error: any) {
     // 清理可能残留的 token
@@ -46,7 +46,7 @@ const handleLogin = async () => {
     if (detail) {
       ElMessage.error(detail)
     } else {
-      ElMessage.error(t('common.failed') || 'Login failed')
+      ElMessage.error(t('common.failed') || '登录失败')
     }
   } finally {
     loading.value = false

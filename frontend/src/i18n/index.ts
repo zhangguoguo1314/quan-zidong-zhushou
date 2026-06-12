@@ -13,8 +13,8 @@ const messages: Record<Lang, Record<string, string>> = {
     'nav.settings': '设置',
     'app.title': '全自动签到助手',
     // 登录
-    'login.title': 'Account Auto-Sign',
-    'login.subtitle': 'Sign in to your account',
+    'login.title': '全自动签到助手',
+    'login.subtitle': '登录你的账号',
     'login.email': '邮箱',
     'login.password': '密码',
     'login.submit': '登录',

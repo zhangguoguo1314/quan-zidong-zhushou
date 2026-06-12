@@ -21,11 +21,12 @@ router = APIRouter(prefix="/api/sites", tags=["sites"])
 # 常用站点预配置模板 - 用户可以一键导入
 SITE_PRESETS = {
     "lizhiyu": {
-        "name": "辉哥boy公益中转站",
-        "display_name": "辉哥公益",
+        "name": "荔枝鱼公益站",
+        "display_name": "荔枝鱼",
         "category": "公益站点",
         "type": "custom-api",
-        "description": "https://lizhiyu.appleinc.cn - Bearer Token 认证",
+        "url": "https://lizhiyu.appleinc.cn",
+        "description": "每日签到获取免费额度，Bearer Token 认证",
         "api_config": {
             "login_url": "https://lizhiyu.appleinc.cn/v1/user/login-pwd",
             "login_method": "POST",
@@ -42,12 +43,13 @@ SITE_PRESETS = {
             "message_field": "message"
         }
     },
-    "gemai-template": {
-        "name": "哈基米API站（通用模板）",
+    "gemai": {
+        "name": "哈基米API站",
         "display_name": "哈基米API",
         "category": "API服务",
         "type": "custom-api",
-        "description": "https://api.gemai.cc 风格的站点 - Session Cookie + Header 认证",
+        "url": "https://api.gemai.cc",
+        "description": "AI模型聚合平台，每日签到获取5-20随机额度",
         "api_config": {
             "login_url": "https://api.gemai.cc/api/user/login",
             "login_method": "POST",
@@ -62,6 +64,30 @@ SITE_PRESETS = {
             "auth_header_name": "New-Api-User",
             "success_field": "success",
             "message_field": "message"
+        }
+    },
+    "binmt": {
+        "name": "binmt论坛",
+        "display_name": "binmt论坛",
+        "category": "论坛社区",
+        "type": "custom-api",
+        "url": "https://bbs.binmt.cc",
+        "description": "Discuz论坛，每日签到获取积分，Misign插件",
+        "api_config": {
+            "login_url": "https://bbs.binmt.cc/member.php?mod=logging&action=login&loginsubmit=yes&infloat=yes&lssubmit=yes&inajax=1",
+            "login_method": "POST",
+            "login_body_template": "username={{username}}&password={{password}}&quickforward=yes&handlekey=login",
+            "login_content_type": "application/x-www-form-urlencoded",
+            "token_path": "",
+            "signin_url": "https://bbs.binmt.cc/plugin.php?id=k_misign:sign&operation=qiandao&format=empty",
+            "signin_method": "GET",
+            "signin_body": "{}",
+            "signin_content_type": "application/json",
+            "auth_header_template": "",
+            "auth_header_name": "",
+            "success_field": "",
+            "message_field": "",
+            "use_login_cookies": True
         }
     }
 }

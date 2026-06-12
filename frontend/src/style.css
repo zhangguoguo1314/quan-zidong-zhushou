@@ -132,3 +132,73 @@
     gap: 8px;
   }
 }
+
+/* ====== 全局按钮美化 ====== */
+
+/* 主按钮 (type="primary") */
+.el-button--primary {
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, #1e3a5f, #2d5a8e) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(30, 58, 95, 0.3) !important;
+  transition: all 0.2s ease !important;
+}
+.el-button--primary:hover,
+.el-button--primary:focus {
+  background: linear-gradient(135deg, #16304f, #244a78) !important;
+  box-shadow: 0 4px 12px rgba(30, 58, 95, 0.4) !important;
+  transform: translateY(-1px);
+}
+.el-button--primary:active {
+  background: linear-gradient(135deg, #0f2440, #1d3d68) !important;
+  box-shadow: 0 1px 3px rgba(30, 58, 95, 0.3) !important;
+  transform: translateY(0);
+}
+
+/* 危险按钮 (type="danger") */
+.el-button--danger {
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, #e74c3c, #c0392b) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3) !important;
+  transition: all 0.2s ease !important;
+}
+.el-button--danger:hover,
+.el-button--danger:focus {
+  background: linear-gradient(135deg, #d44332, #b03525) !important;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4) !important;
+  transform: translateY(-1px);
+}
+.el-button--danger:active {
+  background: linear-gradient(135deg, #c0392b, #a5311f) !important;
+  box-shadow: 0 1px 3px rgba(231, 76, 60, 0.3) !important;
+  transform: translateY(0);
+}
+
+/* 普通按钮 (默认) */
+.el-button--default {
+  border-radius: 8px !important;
+  background: #f0f2f5 !important;
+  border: 1px solid #dcdfe6 !important;
+  color: #303133 !important;
+  transition: all 0.2s ease !important;
+}
+.el-button--default:hover,
+.el-button--default:focus {
+  background: #e0e3e8 !important;
+  border-color: #c0c4cc !important;
+  color: #303133 !important;
+}
+
+/* 小按钮 (size="small") */
+.el-button--small {
+  border-radius: 6px !important;
+  padding: 5px 11px !important;
+}
+
+/* 所有按钮通用 transition */
+.el-button {
+  transition: all 0.2s ease !important;
+}
