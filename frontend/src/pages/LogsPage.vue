@@ -24,7 +24,7 @@ const fetchLogs = async () => {
     const response = await api.get(`/api/logs?${params.toString()}`)
     appStore.setLogs(response.data)
   } catch (error: any) {
-    ElMessage.error('Failed to fetch logs')
+    ElMessage.error('获取日志失败')
   } finally {
     loading.value = false
   }
@@ -32,27 +32,27 @@ const fetchLogs = async () => {
 
 const handleDelete = async (log: any) => {
   try {
-    await ElMessageBox.confirm('Are you sure you want to delete this log?', 'Warning', {
-      confirmButtonText: 'Delete', cancelButtonText: 'Cancel', type: 'warning'
+    await ElMessageBox.confirm('确定要删除这条日志吗？', '警告', {
+      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
     })
     await api.delete(`/api/logs/${log.id}`)
-    ElMessage.success('Log deleted successfully')
+    ElMessage.success('日志删除成功')
     fetchLogs()
   } catch (error: any) {
-    if (error !== 'cancel') ElMessage.error('Failed to delete log')
+    if (error !== 'cancel') ElMessage.error('删除日志失败')
   }
 }
 
 const handleDeleteAll = async () => {
   try {
-    await ElMessageBox.confirm('Are you sure you want to delete all logs?', 'Warning', {
-      confirmButtonText: 'Delete All', cancelButtonText: 'Cancel', type: 'warning'
+    await ElMessageBox.confirm('确定要删除所有日志吗？', '警告', {
+      confirmButtonText: '全部删除', cancelButtonText: '取消', type: 'warning'
     })
     await api.delete('/api/logs')
-    ElMessage.success('All logs deleted successfully')
+    ElMessage.success('所有日志已删除')
     fetchLogs()
   } catch (error: any) {
-    if (error !== 'cancel') ElMessage.error('Failed to delete logs')
+    if (error !== 'cancel') ElMessage.error('删除日志失败')
   }
 }
 
@@ -94,34 +94,34 @@ onMounted(() => {
 
     <main class="main-content">
       <header class="page-header">
-        <h1>Logs</h1>
-        <el-button type="danger" @click="handleDeleteAll">Delete All</el-button>
+        <h1>签到日志</h1>
+        <el-button type="danger" @click="handleDeleteAll">全部删除</el-button>
       </header>
 
       <div class="filters-bar">
-        <el-select v-model="filters.status" placeholder="Filter by status" clearable @change="applyFilters" style="width: 150px">
-          <el-option label="Success" value="success" />
-          <el-option label="Failed" value="failed" />
+        <el-select v-model="filters.status" placeholder="按状态筛选" clearable @change="applyFilters" style="width: 150px">
+          <el-option label="成功" value="success" />
+          <el-option label="失败" value="failed" />
         </el-select>
-        <el-button @click="clearFilters">Clear Filters</el-button>
+        <el-button @click="clearFilters">清除筛选</el-button>
       </div>
 
       <div class="content-card">
         <el-table :data="appStore.logs" style="width: 100%" v-loading="loading">
           <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column prop="task_id" label="Task ID" width="100" />
-          <el-table-column prop="status" label="Status" width="120">
+          <el-table-column prop="task_id" label="任务ID" width="100" />
+          <el-table-column prop="status" label="状态" width="120">
             <template #default="{ row }">
-              <el-tag :type="row.status === 'success' ? 'success' : 'danger'">{{ row.status }}</el-tag>
+              <el-tag :type="row.status === 'success' ? 'success' : 'danger'">{{ row.status === 'success' ? '成功' : '失败' }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="result" label="Result" />
-          <el-table-column prop="created_at" label="Time" width="180">
+          <el-table-column prop="result" label="结果" />
+          <el-table-column prop="created_at" label="时间" width="180">
             <template #default="{ row }">{{ new Date(row.created_at).toLocaleString() }}</template>
           </el-table-column>
-          <el-table-column label="Actions" width="100">
+          <el-table-column label="操作" width="100">
             <template #default="{ row }">
-              <el-button link type="danger" @click="handleDelete(row)">Delete</el-button>
+              <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>

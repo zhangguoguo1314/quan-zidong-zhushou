@@ -52,7 +52,7 @@ const fetchDashboardData = async () => {
 
     recentLogs.value = logsRes.data
   } catch (error: any) {
-    ElMessage.error('Failed to fetch dashboard data')
+    ElMessage.error('获取仪表盘数据失败')
   } finally {
     loading.value = false
   }
@@ -105,7 +105,7 @@ onMounted(() => {
       </div>
       <div class="user-info">
         <span>{{ authStore.user?.email }}</span>
-        <el-button link @click="handleLogout">Logout</el-button>
+        <el-button link @click="handleLogout">退出登录</el-button>
       </div>
     </aside>
 
@@ -119,7 +119,7 @@ onMounted(() => {
           <div class="stat-icon sites">🌐</div>
           <div class="stat-info">
             <span class="stat-value">{{ stats.sites }}</span>
-            <span class="stat-label">Sites</span>
+            <span class="stat-label">站点</span>
           </div>
         </div>
 
@@ -127,7 +127,7 @@ onMounted(() => {
           <div class="stat-icon accounts">👤</div>
           <div class="stat-info">
             <span class="stat-value">{{ stats.accounts }}</span>
-            <span class="stat-label">Accounts</span>
+            <span class="stat-label">账号</span>
           </div>
         </div>
 
@@ -135,7 +135,7 @@ onMounted(() => {
           <div class="stat-icon tasks">⚡</div>
           <div class="stat-info">
             <span class="stat-value">{{ stats.tasks }}</span>
-            <span class="stat-label">Tasks</span>
+            <span class="stat-label">任务</span>
           </div>
         </div>
 
@@ -143,25 +143,25 @@ onMounted(() => {
           <div class="stat-icon rate">📈</div>
           <div class="stat-info">
             <span class="stat-value">{{ stats.successRate }}%</span>
-            <span class="stat-label">Success Rate</span>
+            <span class="stat-label">成功率</span>
           </div>
         </div>
       </div>
 
       <div class="recent-section">
-        <h2>Recent Logs</h2>
+        <h2>最近签到记录</h2>
         <el-table :data="recentLogs" style="width: 100%" v-loading="loading">
           <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column prop="task_id" label="Task ID" width="100" />
-          <el-table-column prop="status" label="Status" width="120">
+          <el-table-column prop="task_id" label="任务ID" width="100" />
+          <el-table-column prop="status" label="状态" width="120">
             <template #default="{ row }">
               <el-tag :type="row.status === 'success' ? 'success' : 'danger'">
-                {{ row.status }}
+                {{ row.status === 'success' ? '成功' : '失败' }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="result" label="Result" />
-          <el-table-column prop="created_at" label="Time" width="180">
+          <el-table-column prop="result" label="结果" />
+          <el-table-column prop="created_at" label="时间" width="180">
             <template #default="{ row }">
               {{ new Date(row.created_at).toLocaleString() }}
             </template>

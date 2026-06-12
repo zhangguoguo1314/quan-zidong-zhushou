@@ -19,17 +19,17 @@ const loading = ref(false)
 
 const handleRegister = async () => {
   if (!form.value.email || !form.value.password || !form.value.confirmPassword) {
-    ElMessage.warning('Please fill in all fields')
+    ElMessage.warning('请填写所有字段')
     return
   }
 
   if (form.value.password !== form.value.confirmPassword) {
-    ElMessage.warning('Passwords do not match')
+    ElMessage.warning('两次输入的密码不一致')
     return
   }
 
   if (form.value.password.length < 6) {
-    ElMessage.warning('Password must be at least 6 characters')
+    ElMessage.warning('密码长度至少为6位')
     return
   }
 
@@ -40,7 +40,7 @@ const handleRegister = async () => {
       password: form.value.password
     })
 
-    ElMessage.success('Registration successful. Please sign in.')
+    ElMessage.success('注册成功，正在登录...')
 
     const loginResponse = await api.post('/api/auth/login', {
       email: form.value.email,
@@ -53,7 +53,7 @@ const handleRegister = async () => {
 
     router.push('/')
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || 'Registration failed')
+    ElMessage.error(error.response?.data?.detail || '注册失败')
   } finally {
     loading.value = false
   }
@@ -112,8 +112,8 @@ const handleRegister = async () => {
       </el-form>
 
       <div class="login-link">
-        Already have an account?
-        <router-link to="/login">Sign in</router-link>
+        已有账号？
+        <router-link to="/login">去登录</router-link>
       </div>
     </div>
   </div>

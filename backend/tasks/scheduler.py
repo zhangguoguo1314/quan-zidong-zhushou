@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -100,34 +101,35 @@ async def perform_sign_in(account, site):
     """根据站点类型动态选择签到插件"""
     site_type = (site.type or "").lower()
     api_config = getattr(site, "api_config", None)
+
+    # 解析 api_config：如果是字符串则 json.loads
+    if isinstance(api_config, str):
+        try:
+            api_config = json.loads(api_config)
+        except (json.JSONDecodeError, TypeError):
+            api_config = None
+
+    # 如果 api_config 为空，尝试从 SITE_PRESETS 中获取预设配置
+    if not api_config:
+        api_config = _get_preset_api_config(site_type)
+
     result = {"success": False, "error": "未知类型"}
 
     try:
-        # 1. custom-api - 通用 API 模式（推荐）
-        if site_type == "custom-api" and api_config:
-            from plugins.custom_api.plugin import CustomApiPlugin
-            plugin = CustomApiPlugin()
-            result = await plugin.sign_in(account, site=site)
+        # 1. 如果有 api_config（无论是直接配置的还是从预设获取的），使用通用执行器
+        if api_config:
+            from services.signin_executor import execute_signin
+            result = await execute_signin(
+                site_type=site_type,
+                site_url=getattr(site, "url", "") or "",
+                account_username=account.username or "",
+                account_password=account.password or "",
+                account_token=getattr(account, "token", None),
+                account_cookie=getattr(account, "cookie", None),
+                api_config=api_config,
+            )
 
-        # 2. gemai - 内置 API 模式
-        elif site_type == "gemai":
-            from plugins.custom_api.plugin import CustomApiPlugin
-            plugin = CustomApiPlugin()
-            result = await plugin.sign_in(account, site=site)
-
-        # 3. lizhiyu - 内置公益站（走 custom-api 逻辑）
-        elif site_type == "lizhiyu" and api_config:
-            from plugins.custom_api.plugin import CustomApiPlugin
-            plugin = CustomApiPlugin()
-            result = await plugin.sign_in(account, site=site)
-
-        # 4. openrouter - OpenRouter 模式
-        elif site_type == "openrouter" and api_config:
-            from plugins.custom_api.plugin import CustomApiPlugin
-            plugin = CustomApiPlugin()
-            result = await plugin.sign_in(account, site=site)
-
-        # 5. forum / custom - Playwright 爬虫模式（仅保留兼容）
+        # 2. forum / custom - Playwright 爬虫模式（仅保留兼容）
         elif site_type in ["forum", "custom"]:
             try:
                 from services.scraper import ScraperService
@@ -136,19 +138,43 @@ async def perform_sign_in(account, site):
             except Exception as e:
                 result = {"success": False, "error": f"Playwright 模式失败: {str(e)}"}
 
-        # 6. 其他类型 - 尝试走 custom_api（如果有 api_config）
-        elif api_config:
-            from plugins.custom_api.plugin import CustomApiPlugin
-            plugin = CustomApiPlugin()
-            result = await plugin.sign_in(account, site=site)
-
+        # 3. 其他无 api_config 的类型
         else:
-            result = {"success": False, "error": f"不支持的站点类型: {site_type}"}
+            result = {"success": False, "error": f"不支持的站点类型: {site_type}，且未配置 api_config"}
 
     except Exception as e:
         result = {"success": False, "error": f"签到执行异常: {str(e)}"}
 
     return result
+
+
+def _get_preset_api_config(site_type: str):
+    """根据站点类型从 SITE_PRESETS 中获取预设的 api_config
+
+    查找策略：
+    1. 直接用 site_type 作为 key 查找 SITE_PRESETS
+    2. 遍历所有预设，匹配预设的 type 字段
+    """
+    try:
+        from api.routes.sites import SITE_PRESETS
+
+        # 策略1：直接 key 匹配
+        preset = SITE_PRESETS.get(site_type)
+        if preset and isinstance(preset, dict):
+            config = preset.get("api_config")
+            if config and isinstance(config, dict):
+                return config
+
+        # 策略2：遍历预设，匹配 type 字段
+        for _key, preset in SITE_PRESETS.items():
+            if isinstance(preset, dict) and preset.get("type") == site_type:
+                config = preset.get("api_config")
+                if config and isinstance(config, dict):
+                    return config
+
+    except Exception as e:
+        print(f"[scheduler] 获取预设配置失败: {e}")
+    return None
 
 
 async def send_notification(account, site, result, db):

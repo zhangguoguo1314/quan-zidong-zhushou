@@ -669,7 +669,7 @@ onMounted(async () => {
 
                 <el-form-item label="上次发送时间">
                   <el-descriptions :column="1" border size="small">
-                    <el-descriptions-item label="Last Sent">
+                    <el-descriptions-item label="上次发送">
                       {{ settingsForm.status_report_last_sent || '从未发送' }}
                     </el-descriptions-item>
                   </el-descriptions>
