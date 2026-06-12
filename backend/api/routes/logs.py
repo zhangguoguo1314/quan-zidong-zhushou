@@ -158,6 +158,9 @@ def get_log_detail(
         "result": log.result,
         "status": log.status,
         "raw_response": log.raw_response or "",
+        "account_username": getattr(log, "account_username", None),
+        "site_name": getattr(log, "site_name", None),
+        "task_name": getattr(log, "task_name", None),
         "created_at": log.created_at,
     }
 

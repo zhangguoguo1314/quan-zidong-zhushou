@@ -44,10 +44,10 @@ class SettingsBase(BaseModel):
     extra: Optional[Dict[str, Any]] = None
 
     # --- AI 配置（第三方 LLM API） ---
-    ai_api_url: str = ""
-    ai_api_key: str = ""
-    ai_model: str = ""
-    ai_custom_prompt: str = ""
+    ai_api_url: Optional[str] = None
+    ai_api_key: Optional[str] = None
+    ai_model: Optional[str] = None
+    ai_custom_prompt: Optional[str] = None
 
     # --- 定时状态报告 ---
     status_report_enabled: bool = False

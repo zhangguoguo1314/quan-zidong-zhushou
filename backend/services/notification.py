@@ -52,7 +52,7 @@ class NotificationService:
                 username=self.username,
                 password=self.password,
                 start_tls=True,
-                timeout=30,
+                timeout=10,
             )
             print(f"[notification] 邮件发送成功 -> {to_email}")
             return True

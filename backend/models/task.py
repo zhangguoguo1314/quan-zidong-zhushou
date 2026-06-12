@@ -9,6 +9,7 @@ class Task(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(200), default="")
     cron = Column(String(100), nullable=False)
     last_run = Column(DateTime(timezone=True))
     status = Column(String(20), default="enabled")

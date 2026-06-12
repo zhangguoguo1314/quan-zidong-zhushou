@@ -17,11 +17,11 @@ scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
 
 
 def run_task(task_id: int):
-    """调度器触发入口 - 必须同步函数（add_job 不支持 async 直接调用）"""
+    """调度器触发入口"""
     import threading
     thread = threading.Thread(target=_run_in_thread, args=(task_id,), daemon=True)
     thread.start()
-    thread.join(timeout=300)
+    # 不等待线程结束，让调度器可以继续处理其他任务
 
 
 def _run_in_thread(task_id: int):
@@ -154,10 +154,6 @@ async def perform_sign_in(account, site, db=None):
     result = {"success": False, "error": "未知类型"}
 
     try:
-        # 0. Cookie 心跳检查：如果配置了 use_login_cookies 且 cookies 过期，先重新登录刷新
-        if api_config and api_config.get("use_login_cookies", False) and db is not None:
-            await refresh_cookies_if_needed(account, site, api_config, db)
-
         # 1. 如果有 api_config（无论是直接配置的还是从预设获取的），使用通用执行器
         if api_config:
             from services.signin_executor import execute_signin
@@ -439,11 +435,10 @@ async def _do_send_status_report(user_id: int):
 
 
 def run_status_report(user_id: int):
-    """调度器触发入口 - 同步函数。"""
+    """调度器触发入口"""
     import threading
     thread = threading.Thread(target=_run_status_report_in_thread, args=(user_id,), daemon=True)
     thread.start()
-    thread.join(timeout=120)
 
 
 def add_status_report_job(user_id: int, interval_minutes: int):

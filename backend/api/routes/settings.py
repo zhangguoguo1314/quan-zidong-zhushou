@@ -231,7 +231,7 @@ def update_email_settings(
 
 
 @router.post("/test-email")
-def test_email(
+async def test_email(
     data: TestEmailRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -239,6 +239,8 @@ def test_email(
     """发送测试邮件，使用 settings 中保存的"签到成功"邮件模板渲染。"""
     try:
         from services.message_template import MessageTemplateService
+        import aiosmtplib
+
         settings = _get_or_create_settings(db, current_user.id)
 
         # 用模板渲染一个示例成功邮件
@@ -264,18 +266,15 @@ def test_email(
         message["Subject"] = f"[测试] {subject}"
         message.attach(MIMEText(body, "plain", "utf-8"))
 
-        import aiosmtplib
-        async def _send():
-            await aiosmtplib.send(
-                message,
-                hostname=data.smtp_host,
-                port=data.smtp_port,
-                username=data.smtp_user,
-                password=data.smtp_password,
-                start_tls=True,
-                timeout=30,
-            )
-        asyncio.run(_send())
+        await aiosmtplib.send(
+            message,
+            hostname=data.smtp_host,
+            port=data.smtp_port,
+            username=data.smtp_user,
+            password=data.smtp_password,
+            start_tls=True,
+            timeout=10,
+        )
         return {"success": True, "message": "测试邮件已发送，请查收"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"发送失败: {e}")
