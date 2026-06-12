@@ -38,7 +38,13 @@ const fetchLogs = async () => {
 
 const handleExportLogs = () => {
   const token = localStorage.getItem('token')
-  window.open('/api/logs/export?token=' + token)
+  const link = document.createElement('a')
+  link.href = `/api/logs/export?token=${token}`
+  link.download = 'signin_logs.csv'
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
 const handleDelete = async (log: any) => {
@@ -149,13 +155,20 @@ onMounted(() => {
       <div class="content-card">
         <el-table :data="appStore.logs" style="width: 100%" v-loading="loading">
           <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column prop="task_id" label="任务ID" width="100" />
-          <el-table-column prop="status" label="状态" width="120">
+          <el-table-column prop="task_name" label="任务名称" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="account_username" label="账号" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="site_name" label="站点" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="status" label="状态" width="100">
             <template #default="{ row }">
-              <el-tag :type="row.status === 'success' ? 'success' : 'danger'">{{ row.status === 'success' ? '成功' : '失败' }}</el-tag>
+              <el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">{{ row.status === 'success' ? '成功' : '失败' }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="result" label="结果" />
+          <el-table-column label="结果" min-width="200">
+            <template #default="{ row }">
+              <span v-if="row.status === 'success'" style="color: #67c23a">{{ row.message || row.result || '成功' }}</span>
+              <span v-else style="color: #f56c6c">{{ row.error || row.result || '失败' }}</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="created_at" label="时间" width="180">
             <template #default="{ row }">{{ new Date(row.created_at).toLocaleString() }}</template>
           </el-table-column>

@@ -67,6 +67,17 @@ async def execute_task(task_id: int):
         print(f"[scheduler] 任务 {task_id} 执行结果: {result}")
         _write_log(db, task_id, result)
 
+        # 更新账号签到统计
+        try:
+            account.total_signins = (account.total_signins or 0) + 1
+            if result.get("success"):
+                account.success_count = (account.success_count or 0) + 1
+            else:
+                account.fail_count = (account.fail_count or 0) + 1
+            db.commit()
+        except Exception as e:
+            print(f"[scheduler] 更新账号签到统计失败: {e}")
+
         # 通知（邮件 + 企业微信机器人）
         try:
             await send_notification(account, site, result, db)
@@ -94,11 +105,29 @@ def _write_log(db: Session, task_id: int, result: dict):
             "message": result.get("message", ""),
             "status_code": result.get("status_code", 0),
         }
+
+        # 查询关联的 task、account、site 信息
+        account_username = ""
+        site_name = ""
+        task_name = ""
+        task_obj = db.query(Task).filter(Task.id == task_id).first()
+        if task_obj:
+            task_name = task_obj.name or ""
+            account = db.query(Account).filter(Account.id == task_obj.account_id).first()
+            if account:
+                account_username = account.username or ""
+                site = db.query(Site).filter(Site.id == account.site_id).first()
+                if site:
+                    site_name = site.name or ""
+
         log = Log(
             task_id=task_id,
             result=json.dumps(detail, ensure_ascii=False),
             status="success" if result.get("success") else "failed",
             raw_response=raw_response[:2000] if raw_response else "",
+            account_username=account_username,
+            site_name=site_name,
+            task_name=task_name,
         )
         db.add(log)
         db.commit()

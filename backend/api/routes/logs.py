@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from io import StringIO
 
 from core.database import get_db
+from core.security import decode_access_token
 from models.log import Log
 from models.task import Task
 from models.account import Account
@@ -13,6 +15,25 @@ from api.deps import get_current_user
 from models.user import User
 
 router = APIRouter(prefix="/api/logs", tags=["logs"])
+
+_optional_bearer = HTTPBearer(auto_error=False)
+
+
+def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """可选鉴权：如果没有提供 token 则返回 None，不抛出异常。"""
+    if credentials is None:
+        return None
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+    user_id = payload.get("user_id")
+    if user_id is None:
+        return None
+    return db.query(User).filter(User.id == user_id).first()
 
 
 @router.get("", response_model=List[LogResponse])
@@ -45,10 +66,31 @@ def export_logs(
     end_date: Optional[str] = None,
     task_id: Optional[int] = None,
     limit: int = Query(1000, ge=1, le=10000),
+    token: Optional[str] = Query(None, description="Bearer token (备选鉴权方式)"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    """导出日志为 CSV 格式"""
+    """导出日志为 CSV 格式
+
+    支持两种鉴权方式：
+    1. 标准 Authorization: Bearer <token> header
+    2. 通过 query parameter ?token=<token>（适用于浏览器直接下载链接）
+    """
+    # 如果 header 鉴权未通过，尝试用 query token 鉴权
+    if current_user is None and token:
+        payload = decode_access_token(token)
+        if payload:
+            user_id = payload.get("user_id")
+            if user_id:
+                current_user = db.query(User).filter(User.id == user_id).first()
+
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required (provide Bearer token via header or ?token= query param)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     query = db.query(Log).join(Task).join(Account).filter(
         Account.user_id == current_user.id
     )
@@ -70,18 +112,24 @@ def export_logs(
     # 生成 CSV
     csv_buffer = StringIO()
     csv_buffer.write("\ufeff")  # BOM for Excel UTF-8
-    csv_buffer.write("ID,任务ID,状态,结果,创建时间\n")
+    csv_buffer.write("ID,任务ID,状态,账号用户名,站点名称,任务名称,结果,创建时间\n")
 
     for log in logs:
         created_at_str = log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else ""
         result_str = (log.result or "").replace('"', '""')
-        csv_buffer.write(f'{log.id},{log.task_id},{log.status},"{result_str}","{created_at_str}"\n')
+        csv_buffer.write(
+            f'{log.id},{log.task_id},{log.status},'
+            f'{getattr(log, "account_username", "") or ""},'
+            f'{getattr(log, "site_name", "") or ""},'
+            f'{getattr(log, "task_name", "") or ""},'
+            f'"{result_str}","{created_at_str}"\n'
+        )
 
     csv_content = csv_buffer.getvalue()
 
     return StreamingResponse(
         iter([csv_content]),
-        media_type="text/csv; charset=utf-8; header=attachment; filename=logs.csv",
+        media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=logs.csv"}
     )
 

@@ -12,6 +12,9 @@ class Log(Base):
     result = Column(Text)
     status = Column(String(20), nullable=False)
     raw_response = Column(Text, default="")
+    account_username = Column(String(200), default="")
+    site_name = Column(String(200), default="")
+    task_name = Column(String(200), default="")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     task = relationship("Task", back_populates="logs")

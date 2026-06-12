@@ -255,6 +255,21 @@ onMounted(() => {
               <el-table-column prop="created_at" label="创建时间" width="160">
                 <template #default="{ row }">{{ new Date(row.created_at).toLocaleDateString('zh-CN') }}</template>
               </el-table-column>
+              <el-table-column label="总签到" width="90" align="center">
+                <template #default="{ row }">{{ row.total_signins != null ? row.total_signins : '-' }}</template>
+              </el-table-column>
+              <el-table-column label="成功" width="90" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.success_count != null" type="success" size="small">{{ row.success_count }}</el-tag>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="失败" width="90" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.fail_count != null" type="danger" size="small">{{ row.fail_count }}</el-tag>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
               <el-table-column label="操作" width="180">
                 <template #default="{ row }">
                   <el-button link type="primary" @click="openDialog({ ...row, site_id: group.site_id })">编辑</el-button>

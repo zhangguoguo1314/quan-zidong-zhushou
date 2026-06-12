@@ -8,6 +8,9 @@ class LogResponse(BaseModel):
     task_id: int
     result: Optional[str] = None
     status: str
+    account_username: Optional[str] = ""
+    site_name: Optional[str] = ""
+    task_name: Optional[str] = ""
     created_at: datetime
 
     class Config:
