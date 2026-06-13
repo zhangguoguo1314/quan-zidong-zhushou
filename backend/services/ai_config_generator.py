@@ -1,7 +1,3 @@
-"""
-AI 配置生成器 - 接入第三方 LLM API，为签到助手生成 api_config JSON 配置。
-"""
-
 import httpx
 import json
 import re
@@ -165,3 +161,190 @@ async def generate_config(
         return {"success": False, "error": f"AI 响应格式异常，缺少字段: {str(e)}"}
     except Exception as e:
         return {"success": False, "error": f"AI 生成配置失败: {str(e)}"}
+
+
+# ============ HAR 文件解析与精简 ============
+
+# 登录/签到相关的关键词，用于从海量 HAR 条目中筛选
+_SIGNIN_KEYWORDS = [
+    "login", "signin", "sign-in", "sign_in", "checkin", "check-in", "check_in",
+    "sign", "auth", "token", "session", "cookie",
+    "login-pwd", "logging", "misign", "qiandao",
+    "user/login", "user/sign", "user/check",
+]
+
+# 需要排除的噪声请求（静态资源等）
+_EXCLUDE_EXTENSIONS = [
+    ".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff",
+    ".woff2", ".ttf", ".eot", ".map", ".webp", ".mp4", ".mp3", ".webm",
+    ".pdf", ".zip", ".gz", ".tar",
+]
+
+_EXCLUDE_CONTENT_TYPES = [
+    "image/", "font/", "audio/", "video/", "application/pdf",
+    "application/zip", "application/octet-stream",
+]
+
+
+def parse_and_simplify_har(har_content: str) -> dict:
+    """
+    解析 HAR 文件，自动精简为只包含登录/签到相关的请求。
+
+    返回:
+    {
+        "success": bool,
+        "total_entries": int,        # HAR 总请求数
+        "filtered_entries": int,     # 筛选后的请求数
+        "simplified_text": str,      # 精简后的文本，可直接发给 AI
+        "entries": list,              # 筛选后的请求详情列表
+        "error": str,                 # 错误信息
+    }
+    """
+    try:
+        har = json.loads(har_content)
+    except json.JSONDecodeError as e:
+        return {"success": False, "error": f"HAR 文件 JSON 解析失败: {str(e)}"}
+
+    entries = har.get("log", {}).get("entries", [])
+    total = len(entries)
+
+    if total == 0:
+        return {"success": False, "error": "HAR 文件中没有请求记录", "total_entries": 0}
+
+    # 筛选相关请求
+    filtered = []
+    for entry in entries:
+        url = entry.get("request", {}).get("url", "")
+        method = entry.get("request", {}).get("method", "")
+        status = entry.get("response", {}).get("status", 0)
+        resp_content_type = ""
+
+        # 检查响应 Content-Type
+        resp_headers = entry.get("response", {}).get("headers", [])
+        for h in resp_headers:
+            if h.get("name", "").lower() == "content-type":
+                resp_content_type = h.get("value", "")
+                break
+
+        # 排除静态资源
+        url_lower = url.lower()
+        if any(url_lower.endswith(ext) for ext in _EXCLUDE_EXTENSIONS):
+            continue
+        if any(ct in resp_content_type.lower() for ct in _EXCLUDE_CONTENT_TYPES):
+            continue
+
+        # 排除 OPTIONS 预检请求
+        if method == "OPTIONS":
+            continue
+
+        # 关键词匹配
+        url_path = url.split("?")[0].lower()
+        matched = False
+        for kw in _SIGNIN_KEYWORDS:
+            if kw.lower() in url_path:
+                matched = True
+                break
+
+        # 也检查 POST 请求（登录和签到通常是 POST）
+        if not matched and method == "POST":
+            # 检查请求体是否包含密码/用户名字段
+            post_data = entry.get("request", {}).get("postData", {})
+            mime_type = post_data.get("mimeType", "")
+            text = post_data.get("text", "")
+            if text and ("password" in text.lower() or "username" in text.lower() or "email" in text.lower()):
+                matched = True
+
+        if matched:
+            filtered.append(entry)
+
+    if not filtered:
+        return {
+            "success": False,
+            "error": f"未找到登录/签到相关的请求。HAR 共 {total} 个请求，但都不匹配登录/签到关键词。",
+            "total_entries": total,
+            "filtered_entries": 0,
+        }
+
+    # 精简每个条目，只保留关键信息
+    simplified_entries = []
+    for entry in filtered:
+        req = entry.get("request", {})
+        resp = entry.get("response", {})
+        req_headers = {h["name"]: h["value"] for h in req.get("headers", [])}
+        resp_headers_list = resp.get("headers", [])
+
+        # 提取 Set-Cookie（登录响应的关键信息）
+        set_cookies = []
+        for h in resp_headers_list:
+            if h.get("name", "").lower() == "set-cookie":
+                set_cookies.append(h["value"])
+
+        simplified = {
+            "url": req.get("url", ""),
+            "method": req.get("method", ""),
+            "status": resp.get("status", 0),
+            "request_headers": {k: v for k, v in req_headers.items()
+                               if k.lower() in ["content-type", "authorization", "cookie", "referer", "origin"]},
+            "request_body": req.get("postData", {}).get("text", ""),
+            "response_content_type": "",
+            "response_body_preview": "",
+            "set_cookies": set_cookies,
+        }
+
+        # 提取响应 Content-Type
+        for h in resp_headers_list:
+            if h.get("name", "").lower() == "content-type":
+                simplified["response_content_type"] = h["value"]
+                break
+
+        # 提取响应体预览（截断到 2000 字符）
+        resp_content = resp.get("content", {})
+        resp_text = resp_content.get("text", "")
+        if resp_text:
+            # 如果是 base64 编码的，尝试解码
+            encoding = resp_content.get("encoding", "")
+            if encoding == "base64":
+                try:
+                    import base64
+                    resp_text = base64.b64decode(resp_text).decode("utf-8", errors="replace")
+                except Exception:
+                    resp_text = "(base64 encoded, 无法解码)"
+            simplified["response_body_preview"] = resp_text[:2000]
+
+        simplified_entries.append(simplified)
+
+    # 生成精简文本（可直接发给 AI）
+    text_parts = [
+        f"=== HAR 文件分析结果（共 {total} 个请求，筛选出 {len(filtered)} 个相关请求） ===\n"
+    ]
+
+    for i, entry in enumerate(simplified_entries, 1):
+        text_parts.append(f"--- 请求 {i} ---")
+        text_parts.append(f"URL: {entry['method']} {entry['url']}")
+        text_parts.append(f"状态码: {entry['status']}")
+        if entry["request_headers"]:
+            text_parts.append(f"请求头: {json.dumps(entry['request_headers'], ensure_ascii=False)}")
+        if entry["request_body"]:
+            text_parts.append(f"请求体: {entry['request_body'][:1000]}")
+        if entry["response_content_type"]:
+            text_parts.append(f"响应类型: {entry['response_content_type']}")
+        if entry["response_body_preview"]:
+            text_parts.append(f"响应体: {entry['response_body_preview'][:1000]}")
+        if entry["set_cookies"]:
+            # 只保留 cookie 名称，隐藏值
+            cookie_names = []
+            for c in entry["set_cookies"]:
+                name = c.split("=")[0].strip()
+                cookie_names.append(name)
+            text_parts.append(f"Set-Cookie: {', '.join(cookie_names)}")
+        text_parts.append("")
+
+    simplified_text = "\n".join(text_parts)
+
+    return {
+        "success": True,
+        "total_entries": total,
+        "filtered_entries": len(filtered),
+        "simplified_text": simplified_text,
+        "entries": simplified_entries,
+    }
