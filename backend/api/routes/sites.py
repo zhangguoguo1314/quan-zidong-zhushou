@@ -49,21 +49,22 @@ SITE_PRESETS = {
         "category": "API服务",
         "type": "custom-api",
         "url": "https://api.gemai.cc",
-        "description": "AI模型聚合平台，每日签到获取5-20随机额度",
+        "description": "AI模型聚合平台，每日签到获取5-20随机额度（基于New API，Session Cookie认证）",
         "api_config": {
             "login_url": "https://api.gemai.cc/api/user/login",
             "login_method": "POST",
             "login_body_template": '{"username": "{{username}}", "password": "{{password}}"}',
             "login_content_type": "application/json",
-            "token_path": "data.id",
+            "token_path": "",
             "signin_url": "https://api.gemai.cc/api/user/checkin",
             "signin_method": "POST",
             "signin_body": "{}",
             "signin_content_type": "application/json",
-            "auth_header_template": "{{token}}",
-            "auth_header_name": "New-Api-User",
+            "auth_header_template": "",
+            "auth_header_name": "",
             "success_field": "success",
-            "message_field": "message"
+            "message_field": "message",
+            "use_login_cookies": true
         }
     },
     "binmt": {
