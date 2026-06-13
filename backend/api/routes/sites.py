@@ -64,7 +64,7 @@ SITE_PRESETS = {
             "auth_header_name": "",
             "success_field": "success",
             "message_field": "message",
-            "use_login_cookies": true
+            "use_login_cookies": True
         }
     },
     "binmt": {
