@@ -34,31 +34,39 @@ class NotificationService:
         self.from_email = from_email
 
     # --------- 内部 ---------
-    async def _send_email(self, to_email: str, subject: str, body: str) -> bool:
-        """真正的邮件发送逻辑。返回 True 表示成功。"""
+    async def _send_email(self, to_email: str, subject: str, body: str, retry_count: int = 2) -> bool:
+        """真正的邮件发送逻辑。支持重试机制。返回 True 表示成功。"""
         if not self.host or not self.username or not self.password:
             return False
-        try:
-            message = MIMEMultipart()
-            message["From"] = self.from_email or self.username
-            message["To"] = to_email
-            message["Subject"] = subject
-            message.attach(MIMEText(body, "plain", "utf-8"))
 
-            await aiosmtplib.send(
-                message,
-                hostname=self.host,
-                port=self.port,
-                username=self.username,
-                password=self.password,
-                start_tls=True,
-                timeout=10,
-            )
-            print(f"[notification] 邮件发送成功 -> {to_email}")
-            return True
-        except Exception as e:
-            print(f"[notification] 邮件发送失败: {e}")
-            return False
+        last_error = None
+        for attempt in range(1, retry_count + 1):
+            try:
+                message = MIMEMultipart()
+                message["From"] = self.from_email or self.username
+                message["To"] = to_email
+                message["Subject"] = subject
+                message.attach(MIMEText(body, "plain", "utf-8"))
+
+                await aiosmtplib.send(
+                    message,
+                    hostname=self.host,
+                    port=self.port,
+                    username=self.username,
+                    password=self.password,
+                    start_tls=True,
+                    timeout=30,  # 增加超时时间到30秒（原10秒在Docker环境中容易超时）
+                )
+                print(f"[notification] 邮件发送成功 -> {to_email}")
+                return True
+            except Exception as e:
+                last_error = e
+                print(f"[notification] 邮件发送失败 (第 {attempt}/{retry_count} 次): {e}")
+                if attempt < retry_count:
+                    await asyncio.sleep(2)  # 重试前等待2秒
+
+        print(f"[notification] 邮件发送最终失败: {last_error}")
+        return False
 
     # --------- 对外 API ---------
     async def send_signin_notification(
