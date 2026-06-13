@@ -29,10 +29,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional, Any
 from sqlalchemy.orm import Session
 
+from core.utils import to_tz_str
 from models.settings import UserSettings
 from models.log import Log
 from models.account import Account
@@ -149,10 +150,11 @@ class MessageTemplateService:
         会以空字符串替代，防止 template 里出现 ``{account_name}`` 原样残留。
         """
 
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
+        tz_name = getattr(settings, "timezone", "") or "Asia/Shanghai"
         ctx: Dict[str, str] = {
-            "time": now.strftime("%Y-%m-%d %H:%M:%S"),
-            "date": now.strftime("%Y-%m-%d"),
+            "time": to_tz_str(now, tz_name),
+            "date": to_tz_str(now, tz_name, "%Y-%m-%d"),
             "display_name": getattr(settings, "display_name", "") or "",
             "user_email": getattr(user, "email", "") if user else "",
             "message": (result or {}).get("message", "") or "",

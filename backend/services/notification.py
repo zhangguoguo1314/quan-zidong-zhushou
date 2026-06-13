@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional, Dict, Any
 
 import aiosmtplib
+
+from core.utils import to_tz_str
 
 
 class NotificationService:
@@ -166,9 +168,10 @@ async def send_status_report(user_settings, db) -> dict:
     from services.wechat_bot import WechatBotService
     from services.message_template import MessageTemplateService
 
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
+    tz_name = getattr(user_settings, "timezone", "") or "Asia/Shanghai"
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    report_time = now.strftime("%Y-%m-%d %H:%M:%S")
+    report_time = to_tz_str(now, tz_name)
 
     user_id = user_settings.user_id
     user = db.query(User).filter(User.id == user_id).first()

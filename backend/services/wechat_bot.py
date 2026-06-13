@@ -10,7 +10,10 @@ from __future__ import annotations
 import json
 import urllib.request
 import urllib.error
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
+
+from core.utils import to_tz_str
 
 
 class WechatBotService:
@@ -116,8 +119,8 @@ class WechatBotService:
             return self.send_markdown(content)
 
         # ---- 降级 / 兼容版本 ----
-        import datetime
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        tz_name = getattr(settings, "timezone", "") or "Asia/Shanghai" if settings else "Asia/Shanghai"
+        now = to_tz_str(datetime.now(timezone.utc), tz_name)
         if success:
             title = "✅ 签到成功"
             status_text = "成功"
