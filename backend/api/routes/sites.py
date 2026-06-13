@@ -8,6 +8,7 @@ from pydantic import BaseModel
 import asyncio
 
 from core.database import get_db
+from core.utils import to_beijing_iso
 from models.site import Site
 from models.category import Category
 from schemas.site import SiteCreate, SiteUpdate, SiteResponse, SiteTestRequest, SiteBulkImportRequest
@@ -230,7 +231,7 @@ def get_sites_grouped(
             "type": site.type,
             "url": site.url,
             "category": site.category or "其他",
-            "created_at": site.created_at.isoformat() if site.created_at else None
+            "created_at": to_beijing_iso(site.created_at)
         })
 
     # 新格式：按 category 分组的数组

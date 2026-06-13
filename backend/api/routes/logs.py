@@ -7,6 +7,7 @@ from io import StringIO
 
 from core.database import get_db
 from core.security import decode_access_token
+from core.utils import to_beijing_iso, to_beijing_str
 from models.log import Log
 from models.task import Task
 from models.account import Account
@@ -115,7 +116,7 @@ def export_logs(
     csv_buffer.write("ID,任务ID,状态,账号用户名,站点名称,任务名称,结果,创建时间\n")
 
     for log in logs:
-        created_at_str = log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else ""
+        created_at_str = to_beijing_str(log.created_at) if log.created_at else ""
         result_str = (log.result or "").replace('"', '""')
         csv_buffer.write(
             f'{log.id},{log.task_id},{log.status},'
@@ -161,7 +162,7 @@ def get_log_detail(
         "account_username": getattr(log, "account_username", None),
         "site_name": getattr(log, "site_name", None),
         "task_name": getattr(log, "task_name", None),
-        "created_at": log.created_at,
+        "created_at": to_beijing_iso(log.created_at),
     }
 
 
