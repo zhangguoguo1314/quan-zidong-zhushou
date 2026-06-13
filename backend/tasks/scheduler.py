@@ -1,6 +1,7 @@
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -154,8 +155,14 @@ async def perform_sign_in(account, site, db=None):
     result = {"success": False, "error": "未知类型"}
 
     try:
+        # 0. Discuz 论坛专用插件（自动提取 formhash，Cookie 认证）
+        if site_type == "discuz":
+            from plugins.discuz.plugin import DiscuzPlugin
+            plugin = DiscuzPlugin()
+            result = await plugin.sign_in(account=account, site=site, api_config=api_config)
+
         # 1. 如果有 api_config（无论是直接配置的还是从预设获取的），使用通用执行器
-        if api_config:
+        elif api_config:
             from services.signin_executor import execute_signin
             result = await execute_signin(
                 site_type=site_type,

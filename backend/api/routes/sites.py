@@ -69,27 +69,17 @@ SITE_PRESETS = {
         }
     },
     "binmt": {
-        "name": "binmt论坛",
-        "display_name": "binmt论坛",
+        "name": "MT论坛",
+        "display_name": "MT论坛",
         "category": "论坛社区",
-        "type": "custom-api",
+        "type": "discuz",
         "url": "https://bbs.binmt.cc",
-        "description": "Discuz论坛，每日签到获取积分，Misign插件",
+        "description": "Discuz! X3.4 论坛，每日签到获取积分（百变每日签到插件）",
         "api_config": {
-            "login_url": "https://bbs.binmt.cc/member.php?mod=logging&action=login&loginsubmit=yes&infloat=yes&lssubmit=yes&inajax=1",
-            "login_method": "POST",
-            "login_body_template": "username={{username}}&password={{password}}&quickforward=yes&handlekey=login",
-            "login_content_type": "application/x-www-form-urlencoded",
-            "token_path": "",
-            "signin_url": "https://bbs.binmt.cc/plugin.php?id=k_misign:sign&operation=qiandao&format=empty",
-            "signin_method": "GET",
-            "signin_body": "{}",
-            "signin_content_type": "application/json",
-            "auth_header_template": "",
-            "auth_header_name": "",
-            "success_field": "",
-            "message_field": "",
-            "use_login_cookies": True
+            "base_url": "https://bbs.binmt.cc",
+            "cookiepre": "",
+            "login_questionid": "0",
+            "login_answer": ""
         }
     }
 }

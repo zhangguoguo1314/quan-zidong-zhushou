@@ -16,6 +16,7 @@ from email.mime.multipart import MIMEMultipart
 
 from core.database import get_db
 from core.security import verify_password, get_password_hash
+from core.utils import TIMEZONE_OPTIONS
 from models.settings import UserSettings
 from models.user import User
 from services.message_template import MessageTemplateService
@@ -51,6 +52,14 @@ def get_settings(
     current_user: User = Depends(get_current_user),
 ):
     return _get_or_create_settings(db, current_user.id)
+
+
+@router.get("/timezones")
+def get_timezone_options(
+    _: User = Depends(get_current_user),
+):
+    """返回可选的时区列表，供前端设置页面使用。"""
+    return {"timezones": TIMEZONE_OPTIONS}
 
 
 @router.put("", response_model=SettingsResponse)
