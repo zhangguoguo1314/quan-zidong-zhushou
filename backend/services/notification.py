@@ -168,7 +168,7 @@ async def send_status_report(user_settings, db) -> dict:
     from services.wechat_bot import WechatBotService
     from services.message_template import MessageTemplateService
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     tz_name = getattr(user_settings, "timezone", "") or "Asia/Shanghai"
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     report_time = to_tz_str(now, tz_name)

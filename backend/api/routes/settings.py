@@ -13,10 +13,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from datetime import datetime
 
 from core.database import get_db
 from core.security import verify_password, get_password_hash
-from core.utils import TIMEZONE_OPTIONS
+from core.utils import TIMEZONE_OPTIONS, to_tz_str
 from models.settings import UserSettings
 from models.user import User
 from services.message_template import MessageTemplateService
@@ -93,6 +94,12 @@ def preview_template(
     # 构造一个示例上下文
     scenario = (data.scenario or "success").lower()
 
+    # 获取用户时区设置用于示例时间
+    user_settings = db.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
+    tz_name = getattr(user_settings, "timezone", "") or "Asia/Shanghai"
+    sample_time = to_tz_str(datetime.utcnow(), tz_name)
+    sample_date = to_tz_str(datetime.utcnow(), tz_name, "%Y-%m-%d")
+
     if scenario == "success":
         sample = {
             "account_name": "demo_user",
@@ -102,6 +109,8 @@ def preview_template(
             "site_category": "论坛社区",
             "message": "签到成功，获得 10 积分",
             "error": "",
+            "time": sample_time,
+            "date": sample_date,
             "success_count": "5",
             "fail_count": "0",
             "total_count": "5",
@@ -118,6 +127,8 @@ def preview_template(
             "site_category": "论坛社区",
             "message": "",
             "error": "登录失败：用户名或密码错误 (HTTP 401)",
+            "time": sample_time,
+            "date": sample_date,
             "success_count": "4",
             "fail_count": "1",
             "total_count": "5",
@@ -131,12 +142,16 @@ def preview_template(
             "fail_count": "0",
             "total_count": "12",
             "success_rate": "100",
+            "time": sample_time,
+            "date": sample_date,
             "user_email": current_user.email or "you@example.com",
             "display_name": "我的自动签到",
         }
     else:  # error
         sample = {
             "error": "数据库连接超时，请检查服务是否正常",
+            "time": sample_time,
+            "date": sample_date,
             "user_email": current_user.email or "you@example.com",
             "display_name": "我的自动签到",
         }

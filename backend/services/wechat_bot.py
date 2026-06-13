@@ -120,7 +120,7 @@ class WechatBotService:
 
         # ---- 降级 / 兼容版本 ----
         tz_name = getattr(settings, "timezone", "") or "Asia/Shanghai" if settings else "Asia/Shanghai"
-        now = to_tz_str(datetime.now(timezone.utc), tz_name)
+        now = to_tz_str(datetime.utcnow(), tz_name)
         if success:
             title = "✅ 签到成功"
             status_text = "成功"

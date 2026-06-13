@@ -150,7 +150,7 @@ class MessageTemplateService:
         会以空字符串替代，防止 template 里出现 ``{account_name}`` 原样残留。
         """
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         tz_name = getattr(settings, "timezone", "") or "Asia/Shanghai"
         ctx: Dict[str, str] = {
             "time": to_tz_str(now, tz_name),
