@@ -3,8 +3,7 @@ import json
 import asyncio
 import threading
 from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
-from datetime import timezone as dt_timezone
+from datetime import datetime
 
 
 # ============ 多账户并发隔离锁 ============
@@ -629,7 +628,7 @@ def save_login_cookies(account_id: int, cookies_dict: dict, db):
         account = db.query(Account).filter(Account.id == account_id).first()
         if account:
             account.login_cookies = json.dumps(cookies_dict, ensure_ascii=False)
-            account.cookies_updated_at = datetime.now(dt_timezone.utc).astimezone(dt_timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+            account.cookies_updated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
             db.commit()
             print(f"[signin_executor] 已保存账号 {account_id} 的登录 cookies (共 {len(cookies_dict)} 个)")
     except Exception as e:

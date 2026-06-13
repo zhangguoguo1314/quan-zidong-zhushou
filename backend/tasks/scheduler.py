@@ -1,7 +1,6 @@
 import asyncio
 import json
-from datetime import datetime, timedelta
-from datetime import timezone as dt_timezone
+from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -48,7 +47,7 @@ async def execute_task(task_id: int):
             print(f"[scheduler] 任务 {task_id} 已禁用，跳过执行")
             return
 
-        task.last_run = datetime.now(dt_timezone.utc).astimezone(dt_timezone(timedelta(hours=8)))
+        task.last_run = datetime.utcnow()
         db.commit()
 
         account = db.query(Account).filter(Account.id == task.account_id).first()
@@ -235,7 +234,7 @@ async def refresh_cookies_if_needed(account, site, api_config: dict, db):
         else:
             try:
                 updated = datetime.strptime(cookies_updated_at, "%Y-%m-%d %H:%M:%S")
-                elapsed = (datetime.now(dt_timezone.utc).astimezone(dt_timezone(timedelta(hours=8))).replace(tzinfo=None) - updated).total_seconds()
+                elapsed = (datetime.utcnow() - updated).total_seconds()
                 if elapsed > heartbeat_hours * 3600:
                     need_refresh = True
             except (ValueError, TypeError):
